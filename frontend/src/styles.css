@@ -1,90 +1,419 @@
-* {
-  box-sizing: border-box;
-}
-
-body {
-  font-family: sans-serif;
-  margin: 20px;
-  padding: 0;
-}
-
-h1 {
-  margin-top: 0;
-  font-size: 22px;
-}
-
-h2 {
-  margin-top: 0;
-  font-size: 20px;
-}
-
-h3 {
-  margin-top: 0;
-  font-size: 18px;
-}
-
-h4 {
-  margin-top: 0;
-  font-size: 16px;
-}
-
-h5 {
-  margin-top: 0;
-  font-size: 14px;
-}
-
-h6 {
-  margin-top: 0;
-  font-size: 12px;
-}
-
-code {
-  font-size: 1.2em;
-}
-
-ul {
-  padding-inline-start: 20px;
-}
+/* Oh My Pi Scrabble Styling */
 
 * {
   box-sizing: border-box;
 }
 
 body {
-  font-family: sans-serif;
-  margin: 20px;
-  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f0f2f5;
+  color: #2b2d42;
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.App {
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* Layout */
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.game-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  width: 100%;
+  max-width: 1100px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sidebar-column {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  gap: 15px;
+}
+
+.header-bar {
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.header-bar h1 {
+  font-size: 28px;
+  color: #5d4037;
+  margin: 0;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+  font-weight: 800;
+}
+
+/* Scrabble Board Styles */
+.board {
+  display: inline-block;
+  background-color: #795548; /* Wooden board border */
+  border: 6px solid #5d4037;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.board-row {
+  display: flex;
 }
 
 .square {
-  background: #fff;
-  border: 1px solid #999;
-  float: left;
-  font-size: 24px;
-  font-weight: bold;
-  line-height: 34px;
-  height: 34px;
-  margin-right: -1px;
-  margin-top: -1px;
-  padding: 0;
-  text-align: center;
-  width: 34px;
-}
-
-.board-row:after {
-  clear: both;
-  content: '';
-  display: table;
-}
-
-.status {
-  margin-bottom: 10px;
-}
-.game {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(93, 64, 55, 0.35);
+  margin: 1px;
   display: flex;
-  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  background-color: #efebe9; /* Default square color */
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
-.game-info {
-  margin-left: 20px;
+.square:hover {
+  filter: brightness(0.95);
+}
+
+/* Multiplier Cells */
+.double-letter {
+  background-color: #b3e5fc; /* Light Blue */
+  color: #0277bd;
+}
+
+.triple-letter {
+  background-color: #0288d1; /* Dark Blue */
+  color: #ffffff;
+}
+
+.double-word {
+  background-color: #ffcdd2; /* Pink */
+  color: #c62828;
+}
+
+.triple-word {
+  background-color: #ef5350; /* Red */
+  color: #ffffff;
+}
+
+.center-star {
+  background-color: #ffcdd2;
+  color: #c62828;
+  font-size: 16px;
+}
+
+.multiplier-label {
+  padding: 2px;
+  font-size: 8px;
+  line-height: 1.1;
+  pointer-events: none;
+}
+
+/* Letter Tile Styling */
+.letter {
+  width: 38px;
+  height: 38px;
+  background-color: #ffe082; /* Tile color - warm yellow/ivory */
+  border: 1px solid #d7ccc8;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.letter:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.letter.selected {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 8px 16px rgba(3, 169, 244, 0.4);
+  border: 2px solid #03a9f4;
+  background-color: #fff9c4;
+}
+
+.letter-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.letter-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: #3e2723;
+}
+
+.letter-value {
+  font-size: 8px;
+  font-weight: bold;
+  color: #5d4037;
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+}
+
+/* Placed but unlocked tiles */
+.square.unlocked .letter {
+  background-color: #fff9c4; /* Light yellow to highlight uncommitted plays */
+  border-color: #ffb300;
+}
+
+/* Rack Area & Bench styling */
+.rack-area {
+  width: 100%;
+  max-width: 600px;
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rack-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: bold;
+  color: #795548;
+  margin-bottom: 4px;
+}
+
+.bench {
+  display: flex;
+  background: linear-gradient(to bottom, #8d6e63, #5d4037);
+  border-bottom: 8px solid #3e2723;
+  border-radius: 6px;
+  padding: 8px 16px;
+  gap: 8px;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  min-height: 56px;
+  align-items: center;
+  justify-content: center;
+}
+
+.bench-empty-slot {
+  width: 38px;
+  height: 38px;
+  background-color: rgba(62, 39, 35, 0.4);
+  border-radius: 4px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* Control Panel */
+.control-panel {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-submit {
+  background-color: #2e7d32; /* Green */
+}
+.btn-submit:hover:not(:disabled) {
+  background-color: #1b5e20;
+}
+
+.btn-recall {
+  background-color: #d84315; /* Orange-Red */
+}
+.btn-recall:hover:not(:disabled) {
+  background-color: #bf360c;
+}
+
+.btn-shuffle {
+  background-color: #795548; /* Brown */
+}
+.btn-shuffle:hover:not(:disabled) {
+  background-color: #5d4037;
+}
+
+.btn-swap {
+  background-color: #0277bd; /* Blue */
+}
+.btn-swap:hover:not(:disabled) {
+  background-color: #01579b;
+}
+
+/* Side Panels */
+.panel {
+  background-color: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: #5d4037;
+  border-bottom: 2px solid #efebe9;
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.score-panel {
+  text-align: center;
+}
+
+.total-score {
+  font-size: 48px;
+  font-weight: 900;
+  color: #2e7d32;
+  line-height: 1;
+  margin: 10px 0;
+}
+
+.bag-status {
+  font-size: 14px;
+  color: #757575;
+}
+
+/* Feedback messages */
+.feedback-alert {
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.feedback-info {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+}
+
+.feedback-success {
+  background-color: #e8f5e9;
+  color: #1b5e20;
+}
+
+.feedback-error {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+/* Word History Log */
+.word-log-panel {
+  max-height: 250px;
+  display: flex;
+  flex-direction: column;
+}
+
+.no-history {
+  font-style: italic;
+  color: #9e9e9e;
+  font-size: 13px;
+  margin: 10px 0;
+}
+
+.log-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  padding-right: 4px;
+}
+
+.log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  padding: 6px 10px;
+  background-color: #fafafa;
+  border-radius: 4px;
+  border: 1px solid #efebe9;
+}
+
+.log-word {
+  font-weight: 700;
+  color: #3e2723;
+  text-transform: uppercase;
+}
+
+.log-points {
+  font-weight: bold;
+  color: #2e7d32;
+}
+
+/* Instructions Panel */
+.instructions-panel ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: #555555;
+  line-height: 1.6;
+}
+
+.instructions-panel li {
+  margin-bottom: 6px;
+}
+
+/* Loading state */
+.loading {
+  font-size: 18px;
+  font-weight: bold;
+  color: #5d4037;
+  margin-top: 100px;
+  text-align: center;
 }

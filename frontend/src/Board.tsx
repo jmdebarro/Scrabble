@@ -1,298 +1,66 @@
+import { Square, LETTER_VALUES } from "./boardLogic";
+import Letter from "./Letter";
 
-
-enum Multiplier {
-  double_letter = "double_letter",
-  triple_letter = "triple_letter",
-  double_word = "double_word",
-  triple_word = "triple_word",
-  none = "none"
+interface BoardProps {
+  board: Square[][];
+  onSquareClick: (r: number, c: number) => void;
 }
 
-type PropType = {value: Multiplier | null }
-
-const letterValues: Record<string, number> = {
-    "A": 1, "E": 1, "I": 1, "O": 1, "U": 1, "L": 1, "N": 1, "S": 1, "T": 1, "R": 1,
-    "D": 2, "G": 2,
-    "B": 3, "C": 3, "M": 3, "P": 3,
-    "F": 4, "H": 4, "V": 4, "W": 4, "Y": 4,
-    "K": 5,
-    "J": 8, "X": 8,
-    "Q": 10, "Z": 10,
-    "_": 0
-}
-
-const squareValues: Record<Multiplier, string> = {
-    [Multiplier.double_letter]: "2L",
-    [Multiplier.triple_letter]: "3L",
-    [Multiplier.double_word]: "2W",
-    [Multiplier.triple_word]: "3W",
-    [Multiplier.none]: ""
-}
-
-function Square({ value }: PropType) {
-  return <div className="square">{value !== null ? squareValues[value] : ""}</div>;
-}
-
-const BOARD_LAYOUT: Multiplier[][]
-
-export default function Board() {
+export default function Board({ board, onSquareClick }: BoardProps) {
   return (
-    <>
-      <div className="board-row">
-        <Square value={Multiplier.triple_word}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-      <div className="board-row">
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-        <Square value={Multiplier.none}/>
-      </div>
-    </>
+    <div className="board">
+      {board.map((row, r) => (
+        <div key={r} className="board-row">
+          {row.map((square, c) => {
+            const hasLetter = square.letter !== null;
+            const multiplierClass = getMultiplierClass(square.multiplier);
+            const lockClass = square.isLocked ? "locked" : "unlocked";
+            const centerClass = (r === 7 && c === 7) ? "center-star" : "";
+
+            return (
+              <div 
+                className={`square ${multiplierClass} ${centerClass} ${hasLetter ? 'has-letter' : 'empty'} ${lockClass}`}
+                key={`${r}-${c}`}
+                onClick={!hasLetter ? () => onSquareClick(r, c) : undefined}
+              >
+                {hasLetter ? (
+                  <Letter
+                    letter={square.letter!}
+                    value={LETTER_VALUES[square.letter!] || 0}
+                    isSelected={false}
+                    onClick={() => onSquareClick(r, c)}
+                  />
+                ) : (
+                  <span className="multiplier-label">
+                    {getMultiplierLabel(square.multiplier, r, c)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
   );
+}
+
+function getMultiplierClass(multiplier: Square['multiplier']): string {
+  switch (multiplier) {
+    case 'double_letter': return 'double-letter';
+    case 'triple_letter': return 'triple-letter';
+    case 'double_word': return 'double-word';
+    case 'triple_word': return 'triple-word';
+    default: return '';
+  }
+}
+
+function getMultiplierLabel(multiplier: Square['multiplier'], r: number, c: number): string {
+  if (r === 7 && c === 7) return "★";
+  switch (multiplier) {
+    case 'double_letter': return '2L';
+    case 'triple_letter': return '3L';
+    case 'double_word': return '2W';
+    case 'triple_word': return '3W';
+    default: return '';
+  }
 }

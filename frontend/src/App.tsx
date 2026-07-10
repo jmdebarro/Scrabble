@@ -1,7 +1,11 @@
-import Board from "./Board";
+import ScrabbleGame from "./ScrabbleGame";
 
-export default function App() {
+function App() {
   return (
-    <Board />
+    <div className="App">
+      <ScrabbleGame />
+    </div>
   );
 }
+
+export default App;
