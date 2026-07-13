@@ -92,4 +92,3 @@ class GADDAG:
 
     def __repr__(self) -> str:
         return f"GADDAG({repr(self.root)})"
-
