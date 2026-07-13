@@ -39,6 +39,19 @@ export default function ScrabbleGame() {
   const [playedWords, setPlayedWords] = useState<PlayedWordLog[]>([]);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
 
+  interface RecommendationInfo {
+    word: string;
+    r: number;
+    c: number;
+    direction: string;
+    score: number;
+    ev: number;
+    tilesPlaced: { r: number; c: number; letter: string; isBlank: boolean }[];
+  }
+
+  const [recommendation, setRecommendation] = useState<RecommendationInfo | null>(null);
+  const [highlightedSquares, setHighlightedSquares] = useState<{ r: number; c: number }[]>([]);
+
   // Initialize game on mount
   useEffect(() => {
     const initialBag = createTileBag();
@@ -210,7 +223,7 @@ export default function ScrabbleGame() {
       [activeLetters[i], activeLetters[j]] = [activeLetters[j], activeLetters[i]];
     }
 
-    const newBench = [...activeLetters];
+    const newBench: (string | null)[] = [...activeLetters];
     while (newBench.length < 7) {
       newBench.push(null);
     }
@@ -327,6 +340,148 @@ export default function ScrabbleGame() {
     });
   };
 
+  const handleBotPlay = async () => {
+    // 1. First, recall any pending tiles to make sure we have a clean state and full bench
+    const tempBoard = board.map(row => row.map(sq => ({ ...sq })));
+    const tempBench = [...bench];
+    placedTiles.forEach(t => {
+      tempBoard[t.r][t.c].letter = null;
+      tempBench[t.originalIndex] = t.letter;
+    });
+
+    setFeedback({ text: "Bot is thinking... running compiled C++ GADDAG & Monte Carlo Solver...", type: "info" });
+    setRecommendation(null);
+    setHighlightedSquares([]);
+
+    const rackLetters = tempBench.filter((l): l is string => l !== null);
+
+    try {
+      const response = await fetch("http://localhost:5001/api/bot_move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          board: tempBoard,
+          rack: rackLetters,
+          bag: tileBag
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Server error or bot could not find a play.");
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        setFeedback({ text: `Bot chose to pass or found no moves! (${result.error || "No moves"})`, type: "error" });
+        return;
+      }
+
+      // Instead of playing it directly, save the recommendation state!
+      setRecommendation({
+        word: result.word,
+        r: result.r,
+        c: result.c,
+        direction: result.direction,
+        score: result.score,
+        ev: result.ev,
+        tilesPlaced: result.tilesPlaced
+      });
+
+      setFeedback({
+        text: `Bot recommends playing "${result.word}" for +${result.score} pts! See details in sidebar.`,
+        type: "success"
+      });
+
+    } catch (err) {
+      console.error("Bot play request failed:", err);
+      setFeedback({ text: "Failed to connect to Bot backend. Did you run: python3 backend/src/server.py?", type: "error" });
+    }
+  };
+
+  const handleToggleHighlight = () => {
+    if (!recommendation) return;
+    if (highlightedSquares.length > 0) {
+      setHighlightedSquares([]); // toggle off
+    } else {
+      const squaresToHighlight: { r: number; c: number }[] = [];
+      recommendation.tilesPlaced.forEach(tp => {
+        squaresToHighlight.push({ r: tp.r, c: tp.c });
+      });
+      setHighlightedSquares(squaresToHighlight);
+    }
+  };
+
+  const handleApplyRecommendation = () => {
+    if (!recommendation) return;
+
+    // 1. Recall any pending tiles to make sure we have a clean state and full bench
+    const tempBoard = board.map(row => row.map(sq => ({ ...sq })));
+    const tempBench = [...bench];
+    placedTiles.forEach(t => {
+      tempBoard[t.r][t.c].letter = null;
+      tempBench[t.originalIndex] = t.letter;
+    });
+
+    const newBoard = board.map(row => row.map(sq => ({ ...sq })));
+    // Wipe currently placed temporary tiles
+    placedTiles.forEach(t => {
+      newBoard[t.r][t.c].letter = null;
+    });
+
+    const updatedBench = [...tempBench];
+    recommendation.tilesPlaced.forEach((tp: { r: number; c: number; letter: string; isBlank: boolean }) => {
+      const searchLetter = tp.isBlank ? "?" : tp.letter;
+      let indexToConsume = updatedBench.findIndex((l) => {
+        if (l === null) return false;
+        if (searchLetter === "?") return l === " " || l === "_" || l === "?";
+        return l.toUpperCase() === searchLetter.toUpperCase();
+      });
+
+      if (indexToConsume !== -1) {
+        updatedBench[indexToConsume] = null;
+      } else {
+        indexToConsume = updatedBench.findIndex(l => l !== null);
+        if (indexToConsume !== -1) {
+          updatedBench[indexToConsume] = null;
+        }
+      }
+
+      newBoard[tp.r][tp.c].letter = tp.letter;
+      newBoard[tp.r][tp.c].isLocked = true;
+    });
+
+    const newBag = [...tileBag];
+    const finalBench = updatedBench.map(letter => {
+      if (letter === null && newBag.length > 0) {
+        return newBag.pop()!;
+      }
+      return letter;
+    });
+
+    setBoard(newBoard);
+    setTileBag(newBag);
+    setBench(finalBench);
+    setPlacedTiles([]);
+    setSelectedBenchIndices([]);
+    setTotalScore(prev => prev + recommendation.score);
+    setPlayedWords(prev => [
+      { word: `${recommendation.word} (Rec - ${recommendation.score} pts)`, score: recommendation.score },
+      ...prev
+    ]);
+    
+    setRecommendation(null);
+    setHighlightedSquares([]);
+    setFeedback({
+      text: `Applied recommendation! Played "${recommendation.word}" for +${recommendation.score} pts!`,
+      type: "success"
+    });
+  };
+
+  const handleDismissRecommendation = () => {
+    setRecommendation(null);
+    setHighlightedSquares([]);
+  };
+
   return (
     <div className="game-container">
       <div className="game-layout">
@@ -337,7 +492,7 @@ export default function ScrabbleGame() {
             <h1>Oh My Pi Scrabble</h1>
           </div>
           
-          <Board board={board} onSquareClick={handleSquareClick} />
+          <Board board={board} onSquareClick={handleSquareClick} highlightedSquares={highlightedSquares} />
           
           <div className="rack-area">
             <div className="rack-label">Your Rack</div>
@@ -361,6 +516,9 @@ export default function ScrabbleGame() {
             <button className="btn btn-swap" onClick={handleExchangeTile} disabled={selectedBenchIndices.length === 0}>
               Swap Selected
             </button>
+            <button className="btn btn-bot" onClick={handleBotPlay}>
+              Ask GADDAG Bot
+            </button>
           </div>
         </div>
 
@@ -373,6 +531,42 @@ export default function ScrabbleGame() {
               Tiles in Bag: <strong>{tileBag.length}</strong>
             </div>
           </div>
+
+          {recommendation && (
+            <div className="panel recommendation-panel" style={{ border: "2px solid #8e24aa", position: "relative" }}>
+              <h3 style={{ color: "#8e24aa", borderColor: "#e1bee7" }}>GADDAG Bot Recommend</h3>
+              <div className="rec-details" style={{ margin: "12px 0", textAlign: "left", fontSize: "14px" }}>
+                <div>Word: <strong style={{ color: "#6a1b9a", fontSize: "16px" }}>{recommendation.word}</strong></div>
+                <div>Score: <strong>+{recommendation.score} pts</strong></div>
+                <div>Direction: <strong>{recommendation.direction === 'H' ? 'Horizontal' : 'Vertical'}</strong></div>
+                <div>Start Square: <strong>Row {recommendation.r + 1}, Col {recommendation.c + 1}</strong></div>
+                <div>Estimated EV: <strong style={{ color: "#2e7d32" }}>{recommendation.ev}</strong></div>
+              </div>
+              <div className="rec-actions" style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                <button 
+                  className={`btn ${highlightedSquares.length > 0 ? "btn-swap" : "btn-bot"}`} 
+                  onClick={handleToggleHighlight}
+                  style={{ padding: "8px 10px", fontSize: "12.5px" }}
+                >
+                  {highlightedSquares.length > 0 ? "Hide Play" : "Show Play"}
+                </button>
+                <button 
+                  className="btn btn-submit" 
+                  onClick={handleApplyRecommendation}
+                  style={{ padding: "8px 10px", fontSize: "12.5px" }}
+                >
+                  Apply Play
+                </button>
+                <button 
+                  className="btn btn-recall" 
+                  onClick={handleDismissRecommendation}
+                  style={{ padding: "8px 10px", fontSize: "12.5px" }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {feedback && (
             <div className={`feedback-alert feedback-${feedback.type}`}>

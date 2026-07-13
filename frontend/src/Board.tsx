@@ -4,9 +4,10 @@ import Letter from "./Letter";
 interface BoardProps {
   board: Square[][];
   onSquareClick: (r: number, c: number) => void;
+  highlightedSquares?: { r: number; c: number }[];
 }
 
-export default function Board({ board, onSquareClick }: BoardProps) {
+export default function Board({ board, onSquareClick, highlightedSquares }: BoardProps) {
   return (
     <div className="board">
       {board.map((row, r) => (
@@ -19,7 +20,7 @@ export default function Board({ board, onSquareClick }: BoardProps) {
 
             return (
               <div 
-                className={`square ${multiplierClass} ${centerClass} ${hasLetter ? 'has-letter' : 'empty'} ${lockClass}`}
+                className={`square ${multiplierClass} ${centerClass} ${hasLetter ? 'has-letter' : 'empty'} ${lockClass} ${highlightedSquares?.some(hs => hs.r === r && hs.c === c) ? 'highlighted-square' : ''}`}
                 key={`${r}-${c}`}
                 onClick={!hasLetter ? () => onSquareClick(r, c) : undefined}
               >
