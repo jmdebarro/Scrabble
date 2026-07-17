@@ -1,76 +1,80 @@
-/* Oh My Pi Scrabble Styling */
+/* ==========================================================================
+   Oh My Pi Scrabble - Cohesive Wood & Ivory Premium Theme
+   ========================================================================== */
 
+/* Typography & Reset */
 * {
   box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: #f0f2f5;
-  color: #2b2d42;
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+  background-color: #f7f5f0; /* Classic linen/ivory background */
+  background-image: radial-gradient(circle, #fcfbf7 0%, #f3efe6 100%);
+  color: #3e2723; /* Mahogany/Charcoal brown */
   margin: 0;
-  padding: 20px;
-  display: flex;
-  justify-content: center;
+  padding: 0;
+  min-height: 100vh;
 }
 
-.App {
-  width: 100%;
-  max-width: 1200px;
+/* Base Headings */
+h1, h2, h3, h4, h5 {
+  font-family: Georgia, serif;
+  font-weight: 700;
+  color: #4e342e; /* Deep mahogany */
+  margin: 0;
 }
 
-/* Layout */
+/* Layout Container */
 .game-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
 .game-layout {
   display: flex;
-  flex-direction: row;
-  gap: 30px;
-  width: 100%;
-  max-width: 1100px;
+  gap: 32px;
   justify-content: center;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 
+/* Board Column */
 .board-column {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.sidebar-column {
-  display: flex;
-  flex-direction: column;
-  width: 320px;
-  gap: 15px;
+  gap: 16px;
 }
 
 .header-bar {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-align: center;
+  border-bottom: 2px double #d7ccc8;
+  padding-bottom: 12px;
+  width: 100%;
 }
 
 .header-bar h1 {
-  font-size: 28px;
-  color: #5d4037;
-  margin: 0;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-  font-weight: 800;
+  font-size: 32px;
+  letter-spacing: 1px;
+  color: #4e342e;
+  text-shadow: 1px 1px 0px #ffffff;
 }
 
-/* Scrabble Board Styles */
+/* ==========================================================================
+   Scrabble Board & Grid
+   ========================================================================== */
 .board {
-  display: inline-block;
-  background-color: #795548; /* Wooden board border */
-  border: 6px solid #5d4037;
+  background-color: #8d6e63; /* Warm mahogany wood board border */
+  border: 12px solid #5d4037; /* Thick mahogany wood outer frame */
   border-radius: 8px;
-  padding: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 10px;
+  box-shadow: 
+    0 12px 24px rgba(0, 0, 0, 0.25),
+    inset 0 4px 10px rgba(0, 0, 0, 0.3);
+  display: inline-block;
 }
 
 .board-row {
@@ -78,21 +82,22 @@ body {
 }
 
 .square {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(93, 64, 55, 0.35);
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   margin: 1px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: "Helvetica Neue", Arial, sans-serif;
   font-size: 10px;
   font-weight: bold;
   text-align: center;
   text-transform: uppercase;
-  background-color: #efebe9; /* Default square color */
+  background-color: #d7ccc8; /* Default empty square color - warm linen */
   cursor: pointer;
   user-select: none;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: filter 0.15s, transform 0.1s;
 }
 
 .square:hover {
@@ -101,65 +106,73 @@ body {
 
 /* Multiplier Cells */
 .double-letter {
-  background-color: #b3e5fc; /* Light Blue */
-  color: #0277bd;
+  background-color: #b3e5fc; /* Double Letter - Soft sky blue */
+  color: #01579b;
 }
 
 .triple-letter {
-  background-color: #0288d1; /* Dark Blue */
+  background-color: #0288d1; /* Triple Letter - Premium deep cobalt blue */
   color: #ffffff;
 }
 
 .double-word {
-  background-color: #ffcdd2; /* Pink */
-  color: #c62828;
+  background-color: #ffcdd2; /* Double Word - Soft blush pink */
+  color: #b71c1c;
 }
 
 .triple-word {
-  background-color: #ef5350; /* Red */
+  background-color: #e53935; /* Triple Word - Premium rich crimson red */
   color: #ffffff;
 }
 
 .center-star {
-  background-color: #ffcdd2;
-  color: #c62828;
-  font-size: 16px;
+  background-color: #ffcdd2; /* Blush pink */
+  color: #b71c1c;
+  font-size: 18px;
 }
 
 .multiplier-label {
   padding: 2px;
-  font-size: 8px;
+  font-size: 9px;
+  font-weight: 800;
   line-height: 1.1;
   pointer-events: none;
 }
 
-/* Letter Tile Styling */
+/* ==========================================================================
+   Ivory Letter Tiles
+   ========================================================================== */
 .letter {
   width: 38px;
   height: 38px;
-  background-color: #ffe082; /* Tile color - warm yellow/ivory */
-  border: 1px solid #d7ccc8;
+  background-color: #fffde7; /* Warm ivory tile body */
+  background-image: linear-gradient(135deg, #fffdf0 0%, #f9f6df 100%);
+  border: 1px solid #e0dbcd;
+  border-bottom: 3px solid #cfc9b9; /* Thick base to look like a physical wooden tile */
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   cursor: pointer;
   user-select: none;
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .letter:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .letter.selected {
-  transform: translateY(-4px) scale(1.08);
-  box-shadow: 0 8px 16px rgba(3, 169, 244, 0.4);
-  border: 2px solid #03a9f4;
-  background-color: #fff9c4;
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(142, 36, 170, 0.35); /* Royal Purple selection highlight */
+  border: 2px solid #8e24aa;
 }
 
 .letter-content {
@@ -172,12 +185,14 @@ body {
 }
 
 .letter-text {
+  font-family: Georgia, serif;
   font-size: 18px;
-  font-weight: 800;
-  color: #3e2723;
+  font-weight: 900;
+  color: #3e2723; /* Dark mahogany lettering */
 }
 
 .letter-value {
+  font-family: sans-serif;
   font-size: 8px;
   font-weight: bold;
   color: #5d4037;
@@ -188,69 +203,107 @@ body {
 
 /* Placed but unlocked tiles */
 .square.unlocked .letter {
-  background-color: #fff9c4; /* Light yellow to highlight uncommitted plays */
-  border-color: #ffb300;
+  background-image: linear-gradient(135deg, #fffde7 0%, #fff59d 100%); /* Yellowish glow for uncommitted tiles */
+  border-color: #fbc02d;
+  border-bottom: 3px solid #f9a825;
 }
 
-/* Rack Area & Bench styling */
+/* Glowing Pulse for Highlighted Squares */
+.highlighted-square {
+  box-shadow: inset 0 0 0 4px #8e24aa, 0 0 8px #8e24aa !important;
+  animation: pulse-highlight 1.5s infinite alternate;
+}
+
+@keyframes pulse-highlight {
+  0% { opacity: 0.85; }
+  100% { opacity: 1; }
+}
+
+/* ==========================================================================
+   Holographic Translucent Word Preview (Bot Recommendation)
+   ========================================================================== */
+.translucent-letter {
+  opacity: 0.65;
+  border: 2px dashed #7b1fa2 !important;
+  background-image: linear-gradient(135deg, rgba(243, 229, 245, 0.8) 0%, rgba(225, 190, 231, 0.8) 100%) !important;
+  box-shadow: 0 0 10px rgba(142, 36, 170, 0.5) !important;
+  pointer-events: none; /* Clicks bypass cleanly */
+  animation: float-pulse 2s infinite ease-in-out alternate;
+}
+
+@keyframes float-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.02) translateY(-2px);
+    opacity: 0.75;
+  }
+}
+
+/* ==========================================================================
+   Tile Rack Area
+   ========================================================================== */
 .rack-area {
-  width: 100%;
-  max-width: 600px;
-  margin-top: 15px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .rack-label {
-  font-size: 12px;
-  text-transform: uppercase;
+  font-family: Georgia, serif;
+  font-size: 14px;
   font-weight: bold;
-  color: #795548;
-  margin-bottom: 4px;
+  color: #5d4037;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .bench {
   display: flex;
-  background: linear-gradient(to bottom, #8d6e63, #5d4037);
-  border-bottom: 8px solid #3e2723;
+  background-color: #5d4037; /* Premium mahogany rack bar */
+  background-image: linear-gradient(to bottom, #8d6e63 0%, #3e2723 100%);
+  border-bottom: 8px solid #271510;
   border-radius: 6px;
-  padding: 8px 16px;
-  gap: 8px;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-  min-height: 56px;
-  align-items: center;
-  justify-content: center;
+  padding: 10px 20px;
+  gap: 10px;
+  box-shadow: 
+    0 8px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
-.bench-empty-slot {
-  width: 38px;
-  height: 38px;
-  background-color: rgba(62, 39, 35, 0.4);
-  border-radius: 4px;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
-}
-
-/* Control Panel */
+/* ==========================================================================
+   Interactive Control Panel
+   ========================================================================== */
 .control-panel {
   display: flex;
-  gap: 10px;
-  margin-top: 15px;
+  gap: 12px;
   width: 100%;
-  max-width: 600px;
+  margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .btn {
-  flex: 1;
-  padding: 10px 14px;
-  font-size: 14px;
-  font-weight: bold;
+  flex: 1; /* Distribute equal space to all buttons */
+  text-align: center;
+  white-space: nowrap;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
-  color: white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  color: #ffffff;
+  padding: 12px 18px;
+  font-size: 13px;
+  box-shadow: 
+    0 2px 4px rgba(0,0,0,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
 .btn:active {
@@ -258,126 +311,142 @@ body {
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-submit {
-  background-color: #2e7d32; /* Green */
+  background-image: linear-gradient(to bottom, #546a4f 0%, #44533e 100%); /* Muted Olive/Pine Green */
+  border: 1px solid #2d3827;
+  border-bottom: 3px solid #1e2518;
 }
 .btn-submit:hover:not(:disabled) {
-  background-color: #1b5e20;
+  background-image: linear-gradient(to bottom, #44533e 0%, #354231 100%);
 }
 
 .btn-recall {
-  background-color: #d84315; /* Orange-Red */
+  background-image: linear-gradient(to bottom, #8c4f4f 0%, #723b3b 100%); /* Muted Burgundy/Crimson */
+  border: 1px solid #542525;
+  border-bottom: 3px solid #3d1717;
+  flex: 1;
 }
 .btn-recall:hover:not(:disabled) {
-  background-color: #bf360c;
+  background-image: linear-gradient(to bottom, #723b3b 0%, #5d2f2f 100%);
 }
 
 .btn-shuffle {
-  background-color: #795548; /* Brown */
+  background-image: linear-gradient(to bottom, #8d6e63 0%, #6d4c41 100%); /* Walnut Wood Brown */
+  border: 1px solid #4e342e;
+  border-bottom: 3px solid #3e2723;
+  flex: 1;
 }
 .btn-shuffle:hover:not(:disabled) {
-  background-color: #5d4037;
+  background-image: linear-gradient(to bottom, #6d4c41 0%, #5d3a31 100%);
 }
 
 .btn-swap {
-  background-color: #0277bd; /* Blue */
+  background-image: linear-gradient(to bottom, #607d8b 0%, #455a64 100%); /* Slate/Steel Blue-grey */
+  border: 1px solid #37474f;
+  border-bottom: 3px solid #263238;
+  flex: 1;
 }
 .btn-swap:hover:not(:disabled) {
-  background-color: #01579b;
+  background-image: linear-gradient(to bottom, #455a64 0%, #37474f 100%);
 }
 
 .btn-bot {
-  background-color: #6a1b9a; /* Purple */
+  background-image: linear-gradient(to bottom, #6a1b9a 0%, #4a148c 100%); /* Deep, sophisticated eggplant purple */
+  border: 1px solid #311b92;
+  border-bottom: 3px solid #1a237e;
 }
 .btn-bot:hover:not(:disabled) {
-  background-color: #4a148c;
+  background-image: linear-gradient(to bottom, #4a148c 0%, #311b92 100%);
 }
 
-/* Side Panels */
+/* ==========================================================================
+   Luxury Sidebar & Side Panels
+   ========================================================================== */
+.sidebar-column {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Sidebar Panels */
 .panel {
-  background-color: white;
+  background-color: #fdfbf7; /* Luxury thick warm cream paper */
+  border: 1px solid #d7ccc8;
+  border-bottom: 3px solid #bcaaa4; /* Letterpress look */
   border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  padding: 20px;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .panel h3 {
-  margin: 0 0 10px 0;
-  font-size: 16px;
-  color: #5d4037;
-  border-bottom: 2px solid #efebe9;
-  padding-bottom: 6px;
+  font-size: 15px;
+  color: #4e342e; /* Deep mahogany */
   text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px double #d7ccc8;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
   font-weight: 700;
 }
 
+/* Score Panel */
 .score-panel {
   text-align: center;
 }
 
 .total-score {
-  font-size: 48px;
+  font-family: Georgia, serif;
+  font-size: 54px;
   font-weight: 900;
-  color: #2e7d32;
-  line-height: 1;
+  color: #5d4037; /* Mahogany */
   margin: 10px 0;
+  line-height: 1;
+  text-shadow: 1px 1px 1px rgba(255,255,255,0.8);
 }
 
 .bag-status {
-  font-size: 14px;
-  color: #757575;
+  font-size: 12px;
+  color: #795548;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* Feedback messages */
-.feedback-alert {
-  padding: 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+/* Bot Recommendation Card Override */
+.recommendation-panel {
+  border: 2px solid #8e24aa !important;
+  background-color: #fdf5fc !important; /* Soft lavender-cream card background */
+  box-shadow: 
+    0 6px 16px rgba(142, 36, 170, 0.1),
+    0 1px 3px rgba(142, 36, 170, 0.05);
 }
 
-.feedback-info {
-  background-color: #e3f2fd;
-  color: #0d47a1;
-}
-
-.feedback-success {
-  background-color: #e8f5e9;
-  color: #1b5e20;
-}
-
-.feedback-error {
-  background-color: #ffebee;
-  color: #c62828;
-}
-
-/* Word History Log */
+/* Word History Panel */
 .word-log-panel {
-  max-height: 250px;
-  display: flex;
-  flex-direction: column;
+  flex-grow: 1;
 }
 
 .no-history {
   font-style: italic;
-  color: #9e9e9e;
+  color: #8d6e63;
+  text-align: center;
   font-size: 13px;
-  margin: 10px 0;
+  margin: 16px 0;
 }
 
 .log-list {
+  max-height: 250px;
   overflow-y: auto;
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 180px;
   padding-right: 4px;
 }
 
@@ -385,22 +454,29 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
-  padding: 6px 10px;
-  background-color: #fafafa;
-  border-radius: 4px;
+  background-color: #fcfbf7;
   border: 1px solid #efebe9;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  transition: background-color 0.15s;
+}
+
+.log-item:hover {
+  background-color: #f7f5f0;
 }
 
 .log-word {
-  font-weight: 700;
+  font-family: Georgia, serif;
+  font-weight: bold;
   color: #3e2723;
-  text-transform: uppercase;
 }
 
 .log-points {
+  font-family: sans-serif;
   font-weight: bold;
   color: #2e7d32;
+  font-size: 12px;
 }
 
 /* Instructions Panel */
@@ -408,7 +484,7 @@ body {
   margin: 0;
   padding-left: 18px;
   font-size: 12.5px;
-  color: #555555;
+  color: #5d4037;
   line-height: 1.6;
 }
 
@@ -416,25 +492,48 @@ body {
   margin-bottom: 6px;
 }
 
-/* Loading state */
+/* ==========================================================================
+   Feedback Alerts
+   ========================================================================== */
+.feedback-alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: sans-serif;
+  font-weight: 500;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+.feedback-success {
+  background-color: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  color: #1b5e20;
+}
+
+.feedback-error {
+  background-color: #ffebee;
+  border: 1px solid #ffcdd2;
+  color: #b71c1c;
+}
+
+.feedback-info {
+  background-color: #e3f2fd;
+  border: 1px solid #bbdefb;
+  color: #0d47a1;
+}
+
+/* Loading State */
 .loading {
-  font-size: 18px;
+  font-family: Georgia, serif;
+  font-size: 20px;
   font-weight: bold;
   color: #5d4037;
-  margin-top: 100px;
+  margin-top: 120px;
   text-align: center;
 }
 
-.highlighted-square {
-  box-shadow: inset 0 0 0 4px #8e24aa, 0 0 8px #8e24aa !important;
-  animation: pulse-highlight 1.5s infinite alternate;
-}
-
-@keyframes pulse-highlight {
-  0% {
-    opacity: 0.7;
-  }
-  100% {
-    opacity: 1;
-  }
+.valid-word-square {
+  box-shadow: inset 0 0 0 3px #4fc3f7, 0 0 8px rgba(79, 195, 247, 0.6) !important;
+  border-color: #00b0ff !important;
 }

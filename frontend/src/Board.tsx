@@ -5,24 +5,34 @@ interface BoardProps {
   board: Square[][];
   onSquareClick: (r: number, c: number) => void;
   highlightedSquares?: { r: number; c: number }[];
+  recommendedTiles?: { r: number; c: number; letter: string; isBlank: boolean }[];
+  validWordSquares?: { r: number; c: number }[];
 }
 
-export default function Board({ board, onSquareClick, highlightedSquares }: BoardProps) {
+export default function Board({ board, onSquareClick, highlightedSquares, recommendedTiles, validWordSquares }: BoardProps) {
   return (
     <div className="board">
       {board.map((row, r) => (
         <div key={r} className="board-row">
           {row.map((square, c) => {
             const hasLetter = square.letter !== null;
+            const recTile = highlightedSquares && highlightedSquares.length > 0
+              ? recommendedTiles?.find(rt => rt.r === r && rt.c === c)
+              : null;
+
             const multiplierClass = getMultiplierClass(square.multiplier);
             const lockClass = square.isLocked ? "locked" : "unlocked";
             const centerClass = (r === 7 && c === 7) ? "center-star" : "";
+            const isHighlighted = highlightedSquares?.some(hs => hs.r === r && hs.c === c) || false;
+            const highlightClass = isHighlighted ? "highlighted-square" : "";
+            const isValidWordSquare = validWordSquares?.some(vs => vs.r === r && vs.c === c) || false;
+            const validWordClass = isValidWordSquare ? "valid-word-square" : "";
 
             return (
               <div 
-                className={`square ${multiplierClass} ${centerClass} ${hasLetter ? 'has-letter' : 'empty'} ${lockClass} ${highlightedSquares?.some(hs => hs.r === r && hs.c === c) ? 'highlighted-square' : ''}`}
+                className={`square ${multiplierClass} ${centerClass} ${hasLetter ? 'has-letter' : 'empty'} ${lockClass} ${highlightClass} ${validWordClass}`}
                 key={`${r}-${c}`}
-                onClick={!hasLetter ? () => onSquareClick(r, c) : undefined}
+                onClick={!hasLetter && !recTile ? () => onSquareClick(r, c) : undefined}
               >
                 {hasLetter ? (
                   <Letter
@@ -30,6 +40,13 @@ export default function Board({ board, onSquareClick, highlightedSquares }: Boar
                     value={LETTER_VALUES[square.letter!] || 0}
                     isSelected={false}
                     onClick={() => onSquareClick(r, c)}
+                  />
+                ) : recTile ? (
+                  <Letter
+                    letter={recTile.letter}
+                    value={recTile.isBlank ? 0 : LETTER_VALUES[recTile.letter] || 0}
+                    isSelected={false}
+                    isTranslucent={true}
                   />
                 ) : (
                   <span className="multiplier-label">

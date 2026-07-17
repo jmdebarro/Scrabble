@@ -23,6 +23,7 @@ export interface MoveResult {
   error?: string;
   score?: number;
   words?: string[];
+  wordsFormed?: { word: string; cells: { r: number; c: number }[] }[];
 }
 
 export const LETTER_VALUES: Record<string, number> = {
@@ -354,7 +355,8 @@ export function validateAndScoreMove(
   return {
     success: true,
     score: turnScore,
-    words: wordStrings
+    words: wordStrings,
+    wordsFormed: wordsFormed
   };
 }
 

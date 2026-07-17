@@ -5,7 +5,8 @@ import {
   validateAndScoreMove,
   Square,
   PlacedTile,
-  checkWordReal
+  checkWordReal,
+  loadWords
 } from "./boardLogic";
 import Board from "./Board";
 import Bench from "./Bench";
@@ -51,6 +52,7 @@ export default function ScrabbleGame() {
 
   const [recommendation, setRecommendation] = useState<RecommendationInfo | null>(null);
   const [highlightedSquares, setHighlightedSquares] = useState<{ r: number; c: number }[]>([]);
+  const [validWordSquares, setValidWordSquares] = useState<{ r: number; c: number }[]>([]);
 
   // Initialize game on mount
   useEffect(() => {
@@ -72,6 +74,56 @@ export default function ScrabbleGame() {
     setGameInitialized(true);
     setFeedback({ text: "Welcome to Scrabble! Select a tile and place it on the board.", type: "info" });
   }, []);
+
+  // Real-time word validation for highlighting valid plays
+  useEffect(() => {
+    if (placedTiles.length === 0) {
+      setValidWordSquares([]);
+      return;
+    }
+
+    const checkRealTimeWords = async () => {
+      try {
+        const dict = await loadWords();
+        
+        const tilesToValidate: PlacedTile[] = placedTiles.map(t => ({
+          r: t.r,
+          c: t.c,
+          letter: t.letter
+        }));
+
+        const result = validateAndScoreMove(board, tilesToValidate);
+        if (result.success && result.wordsFormed) {
+          let allValid = true;
+          const validSquares: { r: number; c: number }[] = [];
+
+          for (const wordObj of result.wordsFormed) {
+            if (dict.has(wordObj.word.toLowerCase())) {
+              wordObj.cells.forEach(cell => {
+                if (!validSquares.some(s => s.r === cell.r && s.c === cell.c)) {
+                  validSquares.push(cell);
+                }
+              });
+            } else {
+              allValid = false;
+            }
+          }
+
+          if (allValid && validSquares.length > 0) {
+            setValidWordSquares(validSquares);
+          } else {
+            setValidWordSquares([]);
+          }
+        } else {
+          setValidWordSquares([]);
+        }
+      } catch (err) {
+        console.error("Real-time word check failed:", err);
+      }
+    };
+
+    checkRealTimeWords();
+  }, [placedTiles, board]);
 
   // Handle keyboard shortcuts for selecting tiles from the bench
   useEffect(() => {
@@ -492,7 +544,7 @@ export default function ScrabbleGame() {
             <h1>Oh My Pi Scrabble</h1>
           </div>
           
-          <Board board={board} onSquareClick={handleSquareClick} highlightedSquares={highlightedSquares} />
+          <Board board={board} onSquareClick={handleSquareClick} highlightedSquares={highlightedSquares} recommendedTiles={recommendation?.tilesPlaced} validWordSquares={validWordSquares} />
           
           <div className="rack-area">
             <div className="rack-label">Your Rack</div>
@@ -505,19 +557,19 @@ export default function ScrabbleGame() {
 
           <div className="control-panel">
             <button className="btn btn-submit" onClick={handleSubmitWord}>
-              Play Word
+              Play
             </button>
             <button className="btn btn-recall" onClick={handleRecallAll} disabled={placedTiles.length === 0}>
-              Recall All
+              Recall
             </button>
             <button className="btn btn-shuffle" onClick={handleShuffle}>
-              Shuffle Rack
+              Shuffle
             </button>
             <button className="btn btn-swap" onClick={handleExchangeTile} disabled={selectedBenchIndices.length === 0}>
-              Swap Selected
+              Swap
             </button>
             <button className="btn btn-bot" onClick={handleBotPlay}>
-              Ask GADDAG Bot
+              Word Rec
             </button>
           </div>
         </div>

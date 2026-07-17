@@ -897,7 +897,7 @@ public:
                 if (it != RACK_LEAVE_EQUITIES.end()) rack_leave += it->second;
             }
 
-            double composite_ev = avg_ev + 0.5 * rack_leave;
+            double composite_ev = avg_ev + 0.5 * rack_leave + 0.1 * our_score;
 
             if (composite_ev > best_ev) {
                 best_ev = composite_ev;

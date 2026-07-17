@@ -4,13 +4,14 @@ type LetterProps = {
   letter: string;
   value: number;
   isSelected: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  isTranslucent?: boolean;
 };
 
-export default function Letter({ letter, value, isSelected, onClick }: LetterProps) {
+export default function Letter({ letter, value, isSelected, onClick, isTranslucent }: LetterProps) {
   return (
     <div 
-      className={`letter ${isSelected ? 'selected' : ''}`}
+      className={`letter ${isSelected ? 'selected' : ''} ${isTranslucent ? 'translucent-letter' : ''}`}
       onClick={onClick}
     >
       <div className="letter-content">
