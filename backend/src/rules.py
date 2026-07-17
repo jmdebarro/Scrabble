@@ -48,6 +48,7 @@ class MoveEvaluation:
     score: int
     words: list[str]
     placements: list[dict[str, Any]]
+    modifiers: list[dict[str, Any]]
 
 
 _dictionary: set[str] | None = None
@@ -194,7 +195,12 @@ def evaluate_move(
     score = sum(_score_word(board, by_position, cells) for cells in words)
     if len(placements) == 7:
         score += 50
-    return MoveEvaluation(score=score, words=word_strings, placements=placements)
+    modifiers = [
+        {"r": placement["r"], "c": placement["c"], "multiplier": board[placement["r"]][placement["c"]]["multiplier"]}
+        for placement in placements
+        if board[placement["r"]][placement["c"]]["multiplier"] != N
+    ]
+    return MoveEvaluation(score=score, words=word_strings, placements=placements, modifiers=modifiers)
 
 
 def apply_move(board: list[list[dict[str, Any]]], placements: list[dict[str, Any]]) -> None:

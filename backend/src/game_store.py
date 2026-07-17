@@ -207,7 +207,11 @@ class GameStore:
                     state["scores"][player_index] += score_delta
                     state["consecutive"] = 0 if score_delta > 0 else state["consecutive"] + 1
                     scoreless = score_delta == 0
-                    move_payload = {"placements": evaluation.placements, "words": evaluation.words}
+                    move_payload = {
+                        "placements": evaluation.placements,
+                        "words": evaluation.words,
+                        "modifiers": evaluation.modifiers,
+                    }
                     if not state["bag"] and not state["racks"][player_index]:
                         self._finish_went_out(state, player_index)
                 elif action == "exchange":
@@ -303,7 +307,8 @@ class GameStore:
             history.append(
                 {
                     "turn": move["turn_number"], "player": move["player_name"], "action": move["action"],
-                    "score": move["score"], "words": details.get("words", []), "details": details,
+                    "score": move["score"], "words": details.get("words", []),
+                    "modifiers": details.get("modifiers", []), "details": details,
                 }
             )
         return {

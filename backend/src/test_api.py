@@ -37,6 +37,7 @@ def run_tests():
         ],
     )
     assert opening.words == ["AT"] and opening.score == 4
+    assert opening.modifiers == [{"r": 7, "c": 7, "multiplier": "double_word"}]
 
     with TestClient(app) as client:
         assert client.get("/api/health").json() == {"status": "ok"}
@@ -106,6 +107,7 @@ def run_tests():
         )
         assert played.status_code == 200, played.text
         assert played.json()["moves"][0]["words"] == ["AT"]
+        assert played.json()["moves"][0]["modifiers"] == [{"r": 7, "c": 7, "multiplier": "double_word"}]
         assert played.json()["status"] == "finished"
 
         persisted_store = GameStore(os.environ["SCRABBLE_DB_PATH"])

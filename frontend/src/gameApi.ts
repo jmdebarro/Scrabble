@@ -13,6 +13,7 @@ export interface MoveSummary {
   action: "play" | "exchange" | "pass" | "resign";
   score: number;
   words: string[];
+  modifiers: { r: number; c: number; multiplier: string }[];
   details: Record<string, unknown>;
 }
 

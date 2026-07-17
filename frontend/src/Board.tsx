@@ -7,9 +7,10 @@ interface BoardProps {
   highlightedSquares?: { r: number; c: number }[];
   recommendedTiles?: { r: number; c: number; letter: string; isBlank: boolean }[];
   validWordSquares?: { r: number; c: number }[];
+  scorePreview?: { r: number; c: number; score: number; direction: "H" | "V"; side: "before" | "after" } | null;
 }
 
-export default function Board({ board, onSquareClick, highlightedSquares, recommendedTiles, validWordSquares }: BoardProps) {
+export default function Board({ board, onSquareClick, highlightedSquares, recommendedTiles, validWordSquares, scorePreview }: BoardProps) {
   return (
     <div className="board">
       {board.map((row, r) => (
@@ -20,9 +21,10 @@ export default function Board({ board, onSquareClick, highlightedSquares, recomm
               ? recommendedTiles?.find(rt => rt.r === r && rt.c === c)
               : null;
 
-            const multiplierClass = getMultiplierClass(square.multiplier);
+            const isCommittedTile = hasLetter && Boolean(square.isLocked);
+            const multiplierClass = isCommittedTile ? "" : getMultiplierClass(square.multiplier);
             const lockClass = square.isLocked ? "locked" : "unlocked";
-            const centerClass = (r === 7 && c === 7) ? "center-star" : "";
+            const centerClass = (r === 7 && c === 7 && !isCommittedTile) ? "center-star" : "";
             const isHighlighted = highlightedSquares?.some(hs => hs.r === r && hs.c === c) || false;
             const highlightClass = isHighlighted ? "highlighted-square" : "";
             const isValidWordSquare = validWordSquares?.some(vs => vs.r === r && vs.c === c) || false;
@@ -51,6 +53,11 @@ export default function Board({ board, onSquareClick, highlightedSquares, recomm
                 ) : (
                   <span className="multiplier-label">
                     {getMultiplierLabel(square.multiplier, r, c)}
+                  </span>
+                )}
+                {scorePreview?.r === r && scorePreview.c === c && (
+                  <span className={`score-preview score-preview-${scorePreview.direction}-${scorePreview.side}`}>
+                    +{scorePreview.score}
                   </span>
                 )}
               </div>

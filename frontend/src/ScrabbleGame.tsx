@@ -27,6 +27,14 @@ interface Feedback {
   type: "success" | "error" | "info";
 }
 
+interface ScorePreview {
+  r: number;
+  c: number;
+  score: number;
+  direction: "H" | "V";
+  side: "before" | "after";
+}
+
 
 export default function ScrabbleGame() {
   const initialReference = new URLSearchParams(window.location.search).get("game");
@@ -39,10 +47,11 @@ export default function ScrabbleGame() {
   const [pendingTiles, setPendingTiles] = useState<PendingTile[]>([]);
   const [selectedRackIndices, setSelectedRackIndices] = useState<number[]>([]);
   const [validWordSquares, setValidWordSquares] = useState<{ r: number; c: number }[]>([]);
+  const [scorePreview, setScorePreview] = useState<ScorePreview | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
-  const lastVersion = useRef<number | null>(null);
+  const lastSnapshotKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (!gameReference || !token) return;
@@ -67,11 +76,12 @@ export default function ScrabbleGame() {
 
   useEffect(() => {
     if (!snapshot) return;
-    if (lastVersion.current !== snapshot.version) {
+    const snapshotKey = `${snapshot.gameId}:${snapshot.version}`;
+    if (lastSnapshotKey.current !== snapshotKey) {
       setRackView(snapshot.rack);
       setPendingTiles([]);
       setSelectedRackIndices([]);
-      lastVersion.current = snapshot.version;
+      lastSnapshotKey.current = snapshotKey;
     }
   }, [snapshot]);
 
@@ -122,6 +132,7 @@ export default function ScrabbleGame() {
     let cancelled = false;
     if (!snapshot || pendingTiles.length === 0) {
       setValidWordSquares([]);
+      setScorePreview(null);
       return;
     }
 
@@ -134,18 +145,28 @@ export default function ScrabbleGame() {
       }));
       const result = validateAndScoreMove(displayBoard, placements);
       if (!result.success || !result.wordsFormed) {
-        if (!cancelled) setValidWordSquares([]);
+        if (!cancelled) {
+          setValidWordSquares([]);
+          setScorePreview(null);
+        }
         return;
       }
       const dictionary = await loadWords();
       if (result.wordsFormed.some(word => !dictionary.has(word.word.toLowerCase()))) {
-        if (!cancelled) setValidWordSquares([]);
+        if (!cancelled) {
+          setValidWordSquares([]);
+          setScorePreview(null);
+        }
         return;
       }
       const uniqueSquares = result.wordsFormed
         .flatMap(word => word.cells)
         .filter((cell, index, cells) => cells.findIndex(other => other.r === cell.r && other.c === cell.c) === index);
-      if (!cancelled) setValidWordSquares(uniqueSquares);
+      if (!cancelled) {
+        setValidWordSquares(uniqueSquares);
+        const mainWord = [...result.wordsFormed].sort((a, b) => b.cells.length - a.cells.length)[0];
+        setScorePreview(findScorePreview(displayBoard, mainWord.cells, result.score ?? 0));
+      }
     };
 
     void validatePendingWord();
@@ -159,6 +180,16 @@ export default function ScrabbleGame() {
       if (!snapshot || !isYourTurn || busy) return;
       const activeTag = document.activeElement?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
+
+      if (event.key === "Enter") {
+        if (pendingTiles.length > 0) {
+          event.preventDefault();
+          void runAction("play", {
+            placements: pendingTiles.map(({ r, c, letter, isBlank }) => ({ r, c, letter, isBlank })),
+          });
+        }
+        return;
+      }
 
       if (event.key >= "1" && event.key <= "7") {
         const index = Number(event.key) - 1;
@@ -199,6 +230,10 @@ export default function ScrabbleGame() {
     window.history.replaceState({}, "", `?game=${encodeURIComponent(game.gameId)}`);
     setGameReference(game.gameId);
     setToken(sessionToken);
+    lastSnapshotKey.current = null;
+    setRackView(game.rack);
+    setPendingTiles([]);
+    setSelectedRackIndices([]);
     setSnapshot(game);
     setFeedback({ text: game.status === "waiting" ? "Game created. Share the invite link." : "Game ready.", type: "success" });
   };
@@ -344,10 +379,10 @@ export default function ScrabbleGame() {
             board={displayBoard as Square[][]}
             onSquareClick={handleSquareClick}
             validWordSquares={validWordSquares}
+            scorePreview={scorePreview}
           />
 
           <div className="rack-area">
-            <div className="rack-label">Your Rack</div>
             <Bench
               bench={rackDisplay}
               selectedBenchIndices={selectedRackIndices}
@@ -399,9 +434,16 @@ export default function ScrabbleGame() {
               <div className="log-list">
                 {snapshot.moves.map(move => (
                   <div className="log-item" key={move.turn}>
-                    <span className="log-word">
-                      {move.player}: {move.action === "play" ? move.words.join(", ") : move.action}
-                    </span>
+                    <div className="log-description">
+                      <span className="log-word">
+                        {move.player}: {move.action === "play" ? move.words.join(", ") : move.action}
+                      </span>
+                      {move.modifiers.length > 0 && (
+                        <small className="log-modifiers">
+                          Modifiers: {move.modifiers.map(modifier => formatModifier(modifier, move.details)).join(", ")}
+                        </small>
+                      )}
+                    </div>
                     <span className="log-points">{move.score ? `+${move.score}` : "—"}</span>
                   </div>
                 ))}
@@ -415,9 +457,13 @@ export default function ScrabbleGame() {
               disabled={snapshot.status !== "active" || busy}
               onClick={() => window.confirm("Resign this game?") && void runAction("resign")}
             >Resign</button>
-            <button className="text-button" onClick={() => {
+            <button className="btn btn-shuffle" onClick={() => {
               window.history.replaceState({}, "", window.location.pathname);
+              lastSnapshotKey.current = null;
               setSnapshot(null);
+              setRackView([]);
+              setPendingTiles([]);
+              setSelectedRackIndices([]);
               setGameReference(null);
               setToken(null);
             }}>Return to lobby</button>
@@ -426,6 +472,63 @@ export default function ScrabbleGame() {
       </div>
     </div>
   );
+}
+
+
+function findScorePreview(
+  board: Square[][],
+  cells: { r: number; c: number }[],
+  score: number,
+): ScorePreview {
+  const direction: "H" | "V" = cells.every(cell => cell.r === cells[0].r) ? "H" : "V";
+  const ordered = [...cells].sort((a, b) => direction === "H" ? a.c - b.c : a.r - b.r);
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+  const [dr, dc] = direction === "H" ? [0, 1] : [1, 0];
+
+  const countEmptySpace = (start: { r: number; c: number }, step: number) => {
+    let r = start.r + dr * step;
+    let c = start.c + dc * step;
+    let count = 0;
+    while (r >= 0 && r < 15 && c >= 0 && c < 15 && board[r][c].letter === null) {
+      count++;
+      r += dr * step;
+      c += dc * step;
+    }
+    return count;
+  };
+
+  const beforeSpace = countEmptySpace(first, -1);
+  const afterSpace = countEmptySpace(last, 1);
+  return beforeSpace > afterSpace
+    ? { ...first, score, direction, side: "before" }
+    : { ...last, score, direction, side: "after" };
+}
+
+
+function formatModifier(
+  modifier: { r: number; c: number; multiplier: string },
+  details: Record<string, unknown>,
+): string {
+  const labels: Record<string, string> = {
+    double_letter: "2L",
+    triple_letter: "3L",
+    double_word: "2W",
+    triple_word: "3W",
+  };
+  const label = labels[modifier.multiplier] ?? modifier.multiplier;
+  if (modifier.multiplier === "double_word" || modifier.multiplier === "triple_word") {
+    return label;
+  }
+
+  const placements = Array.isArray(details.placements) ? details.placements : [];
+  const placement = placements.find(item => {
+    if (typeof item !== "object" || item === null) return false;
+    const candidate = item as Record<string, unknown>;
+    return candidate.r === modifier.r && candidate.c === modifier.c;
+  }) as Record<string, unknown> | undefined;
+  const letter = typeof placement?.letter === "string" ? placement.letter.toUpperCase() : null;
+  return letter ? `${label} ${letter}` : label;
 }
 
 
