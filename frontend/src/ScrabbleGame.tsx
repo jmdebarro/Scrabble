@@ -181,6 +181,14 @@ export default function ScrabbleGame() {
       const activeTag = document.activeElement?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
 
+      if (event.key === "Backspace") {
+        if (selectedRackIndices.length > 0) {
+          event.preventDefault();
+          setSelectedRackIndices(current => current.slice(0, -1));
+        }
+        return;
+      }
+
       if (event.key === "Enter") {
         if (pendingTiles.length > 0) {
           event.preventDefault();
