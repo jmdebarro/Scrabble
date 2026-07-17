@@ -10,12 +10,14 @@ export type Square = {
   multiplier: Multiplier;
   letter: string | null;
   isLocked?: boolean;
+  isBlank?: boolean;
 };
 
 export interface PlacedTile {
   r: number;
   c: number;
   letter: string;
+  isBlank?: boolean;
 }
 
 export interface MoveResult {
@@ -61,6 +63,7 @@ export function createBoard(): Square[][] {
       multiplier,
       letter: null,
       isLocked: false,
+      isBlank: false,
     }))
   );
 }
@@ -68,7 +71,8 @@ export function createBoard(): Square[][] {
 export function createTileBag(): string[] {
   const distribution: Record<string, number> = {
     A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, J: 1, K: 1, L: 4, M: 2,
-    N: 6, O: 8, P: 2, Q: 1, R: 6, S: 4, T: 6, U: 4, V: 2, W: 2, X: 1, Y: 2, Z: 1
+    N: 6, O: 8, P: 2, Q: 1, R: 6, S: 4, T: 6, U: 4, V: 2, W: 2, X: 1, Y: 2, Z: 1,
+    "?": 2
   };
   const bag: string[] = [];
   for (const [letter, count] of Object.entries(distribution)) {
@@ -320,7 +324,7 @@ export function validateAndScoreMove(
 
     for (const cell of word.cells) {
       const sq = board[cell.r][cell.c];
-      const letterVal = LETTER_VALUES[sq.letter!] || 0;
+      const letterVal = sq.isBlank ? 0 : LETTER_VALUES[sq.letter!] || 0;
 
       // Check if this cell is newly placed (not locked)
       const isNew = placedTiles.some(t => t.r === cell.r && t.c === cell.c);

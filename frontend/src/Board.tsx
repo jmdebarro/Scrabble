@@ -37,7 +37,7 @@ export default function Board({ board, onSquareClick, highlightedSquares, recomm
                 {hasLetter ? (
                   <Letter
                     letter={square.letter!}
-                    value={LETTER_VALUES[square.letter!] || 0}
+                    value={square.isBlank ? 0 : LETTER_VALUES[square.letter!] || 0}
                     isSelected={false}
                     onClick={() => onSquareClick(r, c)}
                   />

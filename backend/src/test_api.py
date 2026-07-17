@@ -2,7 +2,7 @@ import json
 import urllib.request
 import threading
 import time
-from server import ScrabbleBotRequestHandler
+from server import ScrabbleBotRequestHandler, solver_process
 from http.server import HTTPServer
 
 def start_test_server(port=5003):
@@ -56,9 +56,40 @@ def test_api_endpoint():
         assert len(result["word"]) >= 2, f"API returned invalid word '{result['word']}'"
         assert "score" in result, "API response missing score"
         assert "tilesPlaced" in result, "API response missing tilesPlaced"
+
+        first_solver_pid = solver_process._process.pid
+        reordered_payload = {**payload, "rack": list(reversed(payload["rack"])), "bag": list(reversed(payload["bag"]))}
+        repeat_req = urllib.request.Request(
+            url,
+            data=json.dumps(reordered_payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(repeat_req) as repeat_response:
+            repeat_result = json.loads(repeat_response.read().decode("utf-8"))
+        assert repeat_result == result, "Rack/bag ordering changed the deterministic recommendation"
+        assert solver_process._process.pid == first_solver_pid, "Native solver process was not reused"
+
+        blank_board = [[{"letter": None, "multiplier": "none", "isBlank": False} for _ in range(15)] for _ in range(15)]
+        blank_board[7][7] = {"letter": "C", "multiplier": "double_word", "isBlank": False}
+        blank_payload = {"board": blank_board, "rack": ["?"], "bag": []}
+        blank_req = urllib.request.Request(
+            url,
+            data=json.dumps(blank_payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(blank_req) as blank_response:
+            blank_result = json.loads(blank_response.read().decode("utf-8"))
+        assert blank_result["success"] == True, "Solver could not play a blank tile"
+        assert blank_result["tilesPlaced"], "Blank move did not place a tile"
+        assert all(tile["isBlank"] for tile in blank_result["tilesPlaced"]), "Blank identity was lost"
+        assert solver_process._process.pid == first_solver_pid, "Blank request replaced the native process"
+
         print(f"\n✓ C++ GADDAG solver integrated perfectly with Python Web Server!")
         print(f"✓ Recommended Play found: '{result['word']}' scoring {result['score']} pts.")
-        print("✓ Performance: Microseconds search is working flawlessly!")
+        print("✓ Equivalent game states return identical moves and EVs from one persistent solver process.")
+        print(f"✓ Blank tile play preserved zero-point blank identity in '{blank_result['word']}'.")
         
     finally:
         # 5. Cleanly shutdown the server

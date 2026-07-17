@@ -200,18 +200,21 @@ public:
 class BoardState {
 public:
     char grid[15][15];
+    bool blank_grid[15][15];
 
     BoardState() {
         for (int r = 0; r < 15; r++) {
             for (int c = 0; c < 15; c++) {
                 grid[r][c] = 0;
+                blank_grid[r][c] = false;
             }
         }
     }
 
-    void set_tile(int r, int c, char letter) {
+    void set_tile(int r, int c, char letter, bool is_blank = false) {
         if (r >= 0 && r < 15 && c >= 0 && c < 15) {
             grid[r][c] = toupper(letter);
+            blank_grid[r][c] = is_blank;
         }
     }
 
@@ -220,6 +223,10 @@ public:
             return grid[r][c];
         }
         return 0;
+    }
+
+    bool is_blank(int r, int c) const {
+        return r >= 0 && r < 15 && c >= 0 && c < 15 && blank_grid[r][c];
     }
 
     vector<pair<int, int>> get_anchors() const {
@@ -272,6 +279,7 @@ public:
         for (int r = 0; r < 15; r++) {
             for (int c = 0; c < 15; c++) {
                 t.grid[c][r] = grid[r][c];
+                t.blank_grid[c][r] = blank_grid[r][c];
             }
         }
         return t;
@@ -360,7 +368,7 @@ public:
             while (true) {
                 char existing = board.get_tile(curr_r, curr_c);
                 if (existing != 0) {
-                    total += get_letter_value(existing);
+                    total += board.is_blank(curr_r, curr_c) ? 0 : get_letter_value(existing);
                 } else {
                     char c = placed_letters[curr_r][curr_c];
                     int val = is_blank_tile[curr_r][curr_c] ? 0 : get_letter_value(c);
@@ -815,7 +823,7 @@ public:
 
     pair<Move, double> select_best_move_mc(
         const BoardState& board, const vector<char>& rack,
-        vector<char>& unseen_bag, int top_k = 5, int num_simulations = 15
+        vector<char>& unseen_bag, int top_k = 5, int num_simulations = 5
     ) {
         auto all_moves = generator.generate_all_moves(board, rack);
         if (all_moves.empty()) {
@@ -829,34 +837,63 @@ public:
             scored_moves.push_back({m, util});
         }
 
-        sort(scored_moves.begin(), scored_moves.end(), [](const auto& a, const auto& b) {
-            return a.second > b.second;
+        auto move_key = [](const Move& move) {
+            string key = move.word + "|" + to_string(move.r) + "|" + to_string(move.c) + "|" + move.direction;
+            vector<PlacedTile> tiles = move.tiles_placed;
+            sort(tiles.begin(), tiles.end(), [](const PlacedTile& a, const PlacedTile& b) {
+                if (a.r != b.r) return a.r < b.r;
+                if (a.c != b.c) return a.c < b.c;
+                if (a.letter != b.letter) return a.letter < b.letter;
+                return a.is_blank < b.is_blank;
+            });
+            for (const auto& tile : tiles) {
+                key += "|" + to_string(tile.r) + "," + to_string(tile.c) + "," + tile.letter + (tile.is_blank ? "B" : "T");
+            }
+            return key;
+        };
+        sort(scored_moves.begin(), scored_moves.end(), [&](const auto& a, const auto& b) {
+            if (a.second != b.second) return a.second > b.second;
+            return move_key(a.first) < move_key(b.first);
         });
 
         int limit = min((int)scored_moves.size(), top_k);
         Move best_move;
         double best_ev = -9999.0;
 
-        random_device rd;
-        mt19937 rng(rd());
+        // Stable FNV-1a seed: identical game states produce identical rollouts and EVs.
+        uint32_t seed = 2166136261u;
+        auto mix = [&](uint8_t value) {
+            seed ^= value;
+            seed *= 16777619u;
+        };
+        for (int r = 0; r < 15; r++) {
+            for (int c = 0; c < 15; c++) {
+                mix(static_cast<uint8_t>(board.get_tile(r, c)));
+                mix(board.is_blank(r, c) ? 1 : 0);
+            }
+        }
+        vector<char> canonical_rack = rack;
+        vector<char> canonical_bag = unseen_bag;
+        sort(canonical_rack.begin(), canonical_rack.end());
+        sort(canonical_bag.begin(), canonical_bag.end());
+        for (char ch : canonical_rack) mix(static_cast<uint8_t>(ch));
+        mix(0xFF);
+        for (char ch : canonical_bag) mix(static_cast<uint8_t>(ch));
 
         for (int i = 0; i < limit; i++) {
             const auto& move = scored_moves[i].first;
             double total_score_diff = 0.0;
+            mt19937 rng(seed ^ (0x9E3779B9u * static_cast<uint32_t>(i + 1)));
 
             // Apply play temporarily
             BoardState sim_board = board;
             for (const auto& tp : move.tiles_placed) {
-                sim_board.set_tile(tp.r, tp.c, tp.letter);
+                sim_board.set_tile(tp.r, tp.c, tp.letter, tp.is_blank);
             }
 
-            // Remove placed letters from the bag copy
-            vector<char> bag_after_play = unseen_bag;
-            for (const auto& tp : move.tiles_placed) {
-                char ref = tp.is_blank ? '?' : tp.letter;
-                auto it = find(bag_after_play.begin(), bag_after_play.end(), ref);
-                if (it != bag_after_play.end()) bag_after_play.erase(it);
-            }
+            // The rack has already been drawn from unseen_bag by the frontend.
+            // Playing rack tiles therefore does not remove matching tiles from the bag.
+            vector<char> bag_after_play = canonical_bag;
 
             int our_score = MoveScorer::score_move(board, move);
 
@@ -867,9 +904,10 @@ public:
                 }
 
                 // Draw opponent rack
-                shuffle(bag_after_play.begin(), bag_after_play.end(), rng);
-                int draw_size = min(7, (int)bag_after_play.size());
-                vector<char> opp_rack(bag_after_play.begin(), bag_after_play.begin() + draw_size);
+                vector<char> sampled_bag = bag_after_play;
+                shuffle(sampled_bag.begin(), sampled_bag.end(), rng);
+                int draw_size = min(7, (int)sampled_bag.size());
+                vector<char> opp_rack(sampled_bag.begin(), sampled_bag.begin() + draw_size);
 
                 // Find opponent plays
                 auto opp_moves = generator.generate_all_moves(sim_board, opp_rack);
@@ -916,13 +954,8 @@ struct ParsedInput {
     vector<char> bag;
 };
 
-ParsedInput parse_simple_json_stdin() {
+ParsedInput parse_simple_json(const string& full_input) {
     ParsedInput input;
-    string full_input;
-    string line;
-    while (getline(cin, line)) {
-        full_input += line;
-    }
 
     // Helper to find strings in json
     auto extract_array_of_chars = [&](const string& key) -> vector<char> {
@@ -983,7 +1016,14 @@ ParsedInput parse_simple_json_stdin() {
                     if (first_char != string::npos && cell_str[first_char] == '\"') {
                         char letter_val = cell_str[first_char + 1];
                         if (letter_val != '\"') {
-                            input.board.set_tile(r, c, letter_val);
+                            bool is_blank = false;
+                            size_t blank_key = cell_str.find("\"isBlank\"");
+                            if (blank_key != string::npos) {
+                                size_t blank_colon = cell_str.find(":", blank_key);
+                                size_t blank_value = cell_str.find_first_not_of(" \t\r\n", blank_colon + 1);
+                                is_blank = blank_value != string::npos && cell_str.compare(blank_value, 4, "true") == 0;
+                            }
+                            input.board.set_tile(r, c, letter_val, is_blank);
                         }
                     }
                 }
@@ -1002,51 +1042,44 @@ ParsedInput parse_simple_json_stdin() {
 }
 
 int main() {
-    // 1. Parse Inputs from JSON
-    ParsedInput input = parse_simple_json_stdin();
-
-    // 2. Load GADDAG dictionary
+    // Load the dictionary once, then serve newline-delimited JSON requests until stdin closes.
     GADDAG gaddag;
     gaddag.load_dictionary("words.txt");
-
-    // 3. Setup solver
     MoveGenerator generator(gaddag);
     MonteCarloSolver solver(generator);
 
-    // 4. Run Monte Carlo rollout solver
-    auto result = solver.select_best_move_mc(input.board, input.rack, input.bag, 5, 15);
-    Move best_move = result.first;
-    double ev = result.second;
+    string request_json;
+    while (getline(cin, request_json)) {
+        if (request_json.empty()) continue;
 
-    // 5. Serialize best move to stdout as JSON
-    if (!best_move.word.empty()) {
-        int score = MoveScorer::score_move(input.board, best_move);
-        cout << "{\n";
-        cout << "  \"success\": true,\n";
-        cout << "  \"word\": \"" << best_move.word << "\",\n";
-        cout << "  \"r\": " << best_move.r << ",\n";
-        cout << "  \"c\": " << best_move.c << ",\n";
-        cout << "  \"direction\": \"" << best_move.direction << "\",\n";
-        cout << "  \"score\": " << score << ",\n";
-        cout << "  \"ev\": " << round(ev * 100.0) / 100.0 << ",\n";
-        cout << "  \"tilesPlaced\": [\n";
-        for (size_t i = 0; i < best_move.tiles_placed.size(); i++) {
-            const auto& tp = best_move.tiles_placed[i];
-            cout << "    {\n";
-            cout << "      \"r\": " << tp.r << ",\n";
-            cout << "      \"c\": " << tp.c << ",\n";
-            cout << "      \"letter\": \"" << tp.letter << "\",\n";
-            cout << "      \"isBlank\": " << (tp.is_blank ? "true" : "false") << "\n";
-            cout << "    }" << (i == best_move.tiles_placed.size() - 1 ? "" : ",") << "\n";
+        ParsedInput input = parse_simple_json(request_json);
+        auto result = solver.select_best_move_mc(input.board, input.rack, input.bag, 5, 5);
+        Move best_move = result.first;
+        double ev = result.second;
+
+        ostringstream response;
+        if (!best_move.word.empty()) {
+            int score = MoveScorer::score_move(input.board, best_move);
+            response << "{\"success\":true,\"word\":\"" << best_move.word
+                     << "\",\"r\":" << best_move.r
+                     << ",\"c\":" << best_move.c
+                     << ",\"direction\":\"" << best_move.direction
+                     << "\",\"score\":" << score
+                     << ",\"ev\":" << round(ev * 100.0) / 100.0
+                     << ",\"tilesPlaced\":[";
+            for (size_t i = 0; i < best_move.tiles_placed.size(); i++) {
+                const auto& tp = best_move.tiles_placed[i];
+                if (i > 0) response << ",";
+                response << "{\"r\":" << tp.r
+                         << ",\"c\":" << tp.c
+                         << ",\"letter\":\"" << tp.letter
+                         << "\",\"isBlank\":" << (tp.is_blank ? "true" : "false") << "}";
+            }
+            response << "]}";
+        } else {
+            response << "{\"success\":false,\"word\":\"PASS\",\"tilesPlaced\":[]}";
         }
-        cout << "  ]\n";
-        cout << "}\n";
-    } else {
-        cout << "{\n";
-        cout << "  \"success\": false,\n";
-        cout << "  \"word\": \"PASS\",\n";
-        cout << "  \"tilesPlaced\": []\n";
-        cout << "}\n";
+        cout << response.str() << '\n' << flush;
     }
 
     return 0;

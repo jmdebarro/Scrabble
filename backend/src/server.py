@@ -1,7 +1,70 @@
 import json
 import os
 import subprocess
+import threading
+import atexit
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+class PersistentSolver:
+    """Owns one native solver process whose GADDAG is reused across requests."""
+
+    def __init__(self):
+        self._process = None
+        self._lock = threading.Lock()
+        self._src_dir = os.path.dirname(os.path.abspath(__file__))
+        self._executable_path = os.path.join(self._src_dir, "gaddag_solver")
+
+    def _start_locked(self):
+        if self._process is not None and self._process.poll() is None:
+            return
+        self._process = subprocess.Popen(
+            [self._executable_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=self._src_dir,
+            text=True,
+            bufsize=1,
+        )
+
+    def _stop_locked(self):
+        if self._process is None:
+            return
+        if self._process.poll() is None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait()
+        self._process = None
+
+    def solve(self, request_payload):
+        request_line = json.dumps(json.loads(request_payload), separators=(",", ":"))
+        with self._lock:
+            for attempt in range(2):
+                self._start_locked()
+                try:
+                    self._process.stdin.write(request_line + "\n")
+                    self._process.stdin.flush()
+                    response_line = self._process.stdout.readline()
+                    if not response_line:
+                        stderr = self._process.stderr.read().strip()
+                        raise RuntimeError(stderr or "C++ solver exited without a response")
+                    return json.loads(response_line)
+                except (BrokenPipeError, OSError, ValueError, RuntimeError):
+                    self._stop_locked()
+                    if attempt == 1:
+                        raise
+        raise RuntimeError("C++ solver request failed")
+
+    def close(self):
+        with self._lock:
+            self._stop_locked()
+
+
+solver_process = PersistentSolver()
+atexit.register(solver_process.close)
 
 class ScrabbleBotRequestHandler(BaseHTTPRequestHandler):
     
@@ -26,32 +89,8 @@ class ScrabbleBotRequestHandler(BaseHTTPRequestHandler):
                 
                 print(f"\n[POST] Received bot move request. Forwarding to C++ GADDAG solver...")
                 
-                # 2. Paths configuration
-                src_dir = os.path.dirname(os.path.abspath(__file__))
-                executable_path = os.path.join(src_dir, "gaddag_solver")
-                
-                # Fallback to local execution if path doesn't exist
-                if not os.path.exists(executable_path):
-                    executable_path = "./gaddag_solver"
-
-                # 3. Spawn C++ subprocess and pipe the JSON input to stdin
-                process = subprocess.Popen(
-                    [executable_path],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    cwd=src_dir
-                )
-                
-                # Pipe input and wait for result
-                stdout_data, stderr_data = process.communicate(input=post_data)
-                
-                if process.returncode != 0:
-                    error_msg = stderr_data.decode("utf-8") if stderr_data else "C++ solver crashed"
-                    raise RuntimeError(f"C++ solver returned exit code {process.returncode}: {error_msg}")
-
-                # 4. Decode JSON response from C++ solver
-                response_payload = json.loads(stdout_data.decode("utf-8"))
+                # 2. Reuse the native process; its GADDAG is loaded only once.
+                response_payload = solver_process.solve(post_data)
                 
                 # 5. Send success response back to React client
                 self.send_response(200)

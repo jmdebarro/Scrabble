@@ -16,6 +16,7 @@ interface PlacedTileInfo {
   c: number;
   letter: string;
   originalIndex: number;
+  isBlank: boolean;
 }
 
 interface PlayedWordLog {
@@ -89,7 +90,8 @@ export default function ScrabbleGame() {
         const tilesToValidate: PlacedTile[] = placedTiles.map(t => ({
           r: t.r,
           c: t.c,
-          letter: t.letter
+          letter: t.letter,
+          isBlank: t.isBlank
         }));
 
         const result = validateAndScoreMove(board, tilesToValidate);
@@ -207,10 +209,10 @@ export default function ScrabbleGame() {
       const tileInfo = placedTiles.find(t => t.r === r && t.c === c);
       if (tileInfo) {
         const newBoard = board.map((row, ri) =>
-          row.map((sq, ci) => (ri === r && ci === c ? { ...sq, letter: null } : sq))
+          row.map((sq, ci) => (ri === r && ci === c ? { ...sq, letter: null, isBlank: false } : sq))
         );
         const newBench = [...bench];
-        newBench[tileInfo.originalIndex] = tileInfo.letter;
+        newBench[tileInfo.originalIndex] = tileInfo.isBlank ? "?" : tileInfo.letter;
 
         setBoard(newBoard);
         setBench(newBench);
@@ -224,11 +226,22 @@ export default function ScrabbleGame() {
     // Case 2: Clicking an empty cell
     if (selectedBenchIndices.length > 0) {
       const indexToPlace = selectedBenchIndices[0];
-      const letterToPlace = bench[indexToPlace];
-      if (!letterToPlace) return;
+      const rackLetter = bench[indexToPlace];
+      if (!rackLetter) return;
+
+      const isBlank = rackLetter === "?" || rackLetter === "_" || rackLetter === " ";
+      let letterToPlace = rackLetter;
+      if (isBlank) {
+        const chosenLetter = window.prompt("Choose a letter for the blank tile (A-Z):")?.trim().toUpperCase();
+        if (!chosenLetter || !/^[A-Z]$/.test(chosenLetter)) {
+          setFeedback({ text: "Choose one letter from A to Z for the blank tile.", type: "error" });
+          return;
+        }
+        letterToPlace = chosenLetter;
+      }
 
       const newBoard = board.map((row, ri) =>
-        row.map((sq, ci) => (ri === r && ci === c ? { ...sq, letter: letterToPlace } : sq))
+        row.map((sq, ci) => (ri === r && ci === c ? { ...sq, letter: letterToPlace, isBlank } : sq))
       );
       const newBench = [...bench];
       newBench[indexToPlace] = null;
@@ -237,7 +250,8 @@ export default function ScrabbleGame() {
         r,
         c,
         letter: letterToPlace,
-        originalIndex: indexToPlace
+        originalIndex: indexToPlace,
+        isBlank
       };
 
       setBoard(newBoard);
@@ -256,7 +270,8 @@ export default function ScrabbleGame() {
 
     placedTiles.forEach(t => {
       newBoard[t.r][t.c].letter = null;
-      newBench[t.originalIndex] = t.letter;
+      newBoard[t.r][t.c].isBlank = false;
+      newBench[t.originalIndex] = t.isBlank ? "?" : t.letter;
     });
 
     setBoard(newBoard);
@@ -325,7 +340,8 @@ export default function ScrabbleGame() {
     const tilesToValidate: PlacedTile[] = placedTiles.map(t => ({
       r: t.r,
       c: t.c,
-      letter: t.letter
+      letter: t.letter,
+      isBlank: t.isBlank
     }));
 
     const result = validateAndScoreMove(board, tilesToValidate);
@@ -398,7 +414,8 @@ export default function ScrabbleGame() {
     const tempBench = [...bench];
     placedTiles.forEach(t => {
       tempBoard[t.r][t.c].letter = null;
-      tempBench[t.originalIndex] = t.letter;
+      tempBoard[t.r][t.c].isBlank = false;
+      tempBench[t.originalIndex] = t.isBlank ? "?" : t.letter;
     });
 
     setFeedback({ text: "Bot is thinking... running compiled C++ GADDAG & Monte Carlo Solver...", type: "info" });
@@ -471,13 +488,15 @@ export default function ScrabbleGame() {
     const tempBench = [...bench];
     placedTiles.forEach(t => {
       tempBoard[t.r][t.c].letter = null;
-      tempBench[t.originalIndex] = t.letter;
+      tempBoard[t.r][t.c].isBlank = false;
+      tempBench[t.originalIndex] = t.isBlank ? "?" : t.letter;
     });
 
     const newBoard = board.map(row => row.map(sq => ({ ...sq })));
     // Wipe currently placed temporary tiles
     placedTiles.forEach(t => {
       newBoard[t.r][t.c].letter = null;
+      newBoard[t.r][t.c].isBlank = false;
     });
 
     const updatedBench = [...tempBench];
@@ -499,6 +518,7 @@ export default function ScrabbleGame() {
       }
 
       newBoard[tp.r][tp.c].letter = tp.letter;
+      newBoard[tp.r][tp.c].isBlank = tp.isBlank;
       newBoard[tp.r][tp.c].isLocked = true;
     });
 
