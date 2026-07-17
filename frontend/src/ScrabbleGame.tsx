@@ -1,681 +1,488 @@
-import { useState, useEffect } from "react";
-import {
-  createBoard,
-  createTileBag,
-  validateAndScoreMove,
-  Square,
-  PlacedTile,
-  checkWordReal,
-  loadWords
-} from "./boardLogic";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Board from "./Board";
 import Bench from "./Bench";
+import { loadWords, validateAndScoreMove, type PlacedTile, type Square } from "./boardLogic";
+import {
+  createGame,
+  GameSnapshot,
+  joinGame,
+  loadGame,
+  sendAction,
+  tokenStorageKey,
+  websocketUrl,
+} from "./gameApi";
 
-interface PlacedTileInfo {
+
+interface PendingTile {
   r: number;
   c: number;
   letter: string;
-  originalIndex: number;
   isBlank: boolean;
+  originalIndex: number;
 }
 
-interface PlayedWordLog {
-  word: string;
-  score: number;
-}
 
-interface FeedbackMessage {
+interface Feedback {
   text: string;
   type: "success" | "error" | "info";
 }
 
+
 export default function ScrabbleGame() {
-  const [gameInitialized, setGameInitialized] = useState(false);
-  const [board, setBoard] = useState<Square[][]>([]);
-  const [tileBag, setTileBag] = useState<string[]>([]);
-  const [bench, setBench] = useState<(string | null)[]>([]);
-  const [placedTiles, setPlacedTiles] = useState<PlacedTileInfo[]>([]);
-  const [selectedBenchIndices, setSelectedBenchIndices] = useState<number[]>([]);
-  
-  const [totalScore, setTotalScore] = useState<number>(0);
-  const [playedWords, setPlayedWords] = useState<PlayedWordLog[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
-
-  interface RecommendationInfo {
-    word: string;
-    r: number;
-    c: number;
-    direction: string;
-    score: number;
-    ev: number;
-    tilesPlaced: { r: number; c: number; letter: string; isBlank: boolean }[];
-  }
-
-  const [recommendation, setRecommendation] = useState<RecommendationInfo | null>(null);
-  const [highlightedSquares, setHighlightedSquares] = useState<{ r: number; c: number }[]>([]);
+  const initialReference = new URLSearchParams(window.location.search).get("game");
+  const [gameReference, setGameReference] = useState<string | null>(initialReference);
+  const [token, setToken] = useState<string | null>(() =>
+    initialReference ? localStorage.getItem(tokenStorageKey(initialReference)) : null,
+  );
+  const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
+  const [rackView, setRackView] = useState<string[]>([]);
+  const [pendingTiles, setPendingTiles] = useState<PendingTile[]>([]);
+  const [selectedRackIndices, setSelectedRackIndices] = useState<number[]>([]);
   const [validWordSquares, setValidWordSquares] = useState<{ r: number; c: number }[]>([]);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const lastVersion = useRef<number | null>(null);
 
-  // Initialize game on mount
   useEffect(() => {
-    const initialBag = createTileBag();
-    const initialBoard = createBoard();
-    
-    // Draw initial 7 tiles
-    const initialBench: (string | null)[] = [];
-    const remainingBag = [...initialBag];
-    for (let i = 0; i < 7; i++) {
-      if (remainingBag.length > 0) {
-        initialBench.push(remainingBag.pop()!);
-      }
+    if (!gameReference || !token) return;
+    let cancelled = false;
+    setBusy(true);
+    loadGame(gameReference, token)
+      .then(game => {
+        if (!cancelled) setSnapshot(game);
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setFeedback({ text: error.message, type: "error" });
+          localStorage.removeItem(tokenStorageKey(gameReference));
+          setToken(null);
+        }
+      })
+      .finally(() => !cancelled && setBusy(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [gameReference, token]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    if (lastVersion.current !== snapshot.version) {
+      setRackView(snapshot.rack);
+      setPendingTiles([]);
+      setSelectedRackIndices([]);
+      lastVersion.current = snapshot.version;
     }
+  }, [snapshot]);
 
-    setBoard(initialBoard);
-    setTileBag(remainingBag);
-    setBench(initialBench);
-    setGameInitialized(true);
-    setFeedback({ text: "Welcome to Scrabble! Select a tile and place it on the board.", type: "info" });
-  }, []);
-
-  // Real-time word validation for highlighting valid plays
   useEffect(() => {
-    if (placedTiles.length === 0) {
+    if (!snapshot || !token) return;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let stopped = false;
+
+    const connect = () => {
+      socket = new WebSocket(websocketUrl(snapshot.gameId, token));
+      socket.onopen = () => setConnected(true);
+      socket.onmessage = event => {
+        const message = JSON.parse(event.data);
+        if (message.type === "game_state") setSnapshot(message.snapshot);
+      };
+      socket.onclose = () => {
+        setConnected(false);
+        if (!stopped) reconnectTimer = window.setTimeout(connect, 1500);
+      };
+      socket.onerror = () => socket?.close();
+    };
+    connect();
+    return () => {
+      stopped = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
+  }, [snapshot?.gameId, token]);
+
+  const displayBoard = useMemo(() => {
+    if (!snapshot) return [];
+    const board = snapshot.board.map(row => row.map(square => ({ ...square })));
+    for (const tile of pendingTiles) {
+      board[tile.r][tile.c].letter = tile.letter;
+      board[tile.r][tile.c].isBlank = tile.isBlank;
+      board[tile.r][tile.c].isLocked = false;
+    }
+    return board;
+  }, [snapshot, pendingTiles]);
+
+  const rackDisplay = rackView.map((letter, index) =>
+    pendingTiles.some(tile => tile.originalIndex === index) ? null : letter,
+  );
+  const isYourTurn = snapshot?.status === "active" && snapshot.activePlayer === snapshot.you;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!snapshot || pendingTiles.length === 0) {
       setValidWordSquares([]);
       return;
     }
 
-    const checkRealTimeWords = async () => {
-      try {
-        const dict = await loadWords();
-        
-        const tilesToValidate: PlacedTile[] = placedTiles.map(t => ({
-          r: t.r,
-          c: t.c,
-          letter: t.letter,
-          isBlank: t.isBlank
-        }));
-
-        const result = validateAndScoreMove(board, tilesToValidate);
-        if (result.success && result.wordsFormed) {
-          let allValid = true;
-          const validSquares: { r: number; c: number }[] = [];
-
-          for (const wordObj of result.wordsFormed) {
-            if (dict.has(wordObj.word.toLowerCase())) {
-              wordObj.cells.forEach(cell => {
-                if (!validSquares.some(s => s.r === cell.r && s.c === cell.c)) {
-                  validSquares.push(cell);
-                }
-              });
-            } else {
-              allValid = false;
-            }
-          }
-
-          if (allValid && validSquares.length > 0) {
-            setValidWordSquares(validSquares);
-          } else {
-            setValidWordSquares([]);
-          }
-        } else {
-          setValidWordSquares([]);
-        }
-      } catch (err) {
-        console.error("Real-time word check failed:", err);
+    const validatePendingWord = async () => {
+      const placements: PlacedTile[] = pendingTiles.map(({ r, c, letter, isBlank }) => ({
+        r,
+        c,
+        letter,
+        isBlank,
+      }));
+      const result = validateAndScoreMove(displayBoard, placements);
+      if (!result.success || !result.wordsFormed) {
+        if (!cancelled) setValidWordSquares([]);
+        return;
       }
+      const dictionary = await loadWords();
+      if (result.wordsFormed.some(word => !dictionary.has(word.word.toLowerCase()))) {
+        if (!cancelled) setValidWordSquares([]);
+        return;
+      }
+      const uniqueSquares = result.wordsFormed
+        .flatMap(word => word.cells)
+        .filter((cell, index, cells) => cells.findIndex(other => other.r === cell.r && other.c === cell.c) === index);
+      if (!cancelled) setValidWordSquares(uniqueSquares);
     };
 
-    checkRealTimeWords();
-  }, [placedTiles, board]);
+    void validatePendingWord();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayBoard, pendingTiles, snapshot]);
 
-  // Handle keyboard shortcuts for selecting tiles from the bench
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
-        return;
-      }
-      const key = e.key;
-      
-      // 1-7 number keys select by index
-      if (key >= "1" && key <= "7") {
-        const index = parseInt(key, 10) - 1;
-        if (index < bench.length) {
-          handleSelectTile(index);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!snapshot || !isYourTurn || busy) return;
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
+
+      if (event.key >= "1" && event.key <= "7") {
+        const index = Number(event.key) - 1;
+        if (rackDisplay[index] !== null && rackDisplay[index] !== undefined) {
+          event.preventDefault();
+          setSelectedRackIndices(current =>
+            current.includes(index) ? current.filter(value => value !== index) : [...current, index],
+          );
         }
         return;
       }
 
-      // Letter keys or space bar select by character
-      if ((key >= "a" && key <= "z") || (key >= "A" && key <= "Z") || key === " ") {
-        const targetLetter = key === " " ? " " : key.toUpperCase();
-        
-        const isMatch = (benchLetter: string | null) => {
-          if (!benchLetter) return false;
-          if (targetLetter === " ") {
-            return benchLetter === " " || benchLetter === "_" || benchLetter === "?";
-          }
-          return benchLetter.toUpperCase() === targetLetter;
-        };
+      const isBlankKey = event.key === " " || event.key === "?";
+      if (!isBlankKey && !/^[a-z]$/i.test(event.key)) return;
+      const target = isBlankKey ? "?" : event.key.toUpperCase();
+      const matchingIndices = rackDisplay
+        .map((letter, index) => ({ letter, index }))
+        .filter(item => item.letter === target)
+        .map(item => item.index);
+      if (matchingIndices.length === 0) return;
 
-        const matchingIndices = bench
-          .map((letter, index) => ({ letter, index }))
-          .filter(item => isMatch(item.letter))
-          .map(item => item.index);
-          
-        if (matchingIndices.length > 0) {
-          const unselectedMatch = matchingIndices.find(index => !selectedBenchIndices.includes(index));
-          if (unselectedMatch !== undefined) {
-            handleSelectTile(unselectedMatch);
-          } else {
-            // If all matching letters are already selected, pressing again deselects the last selected matching one
-            const lastSelectedMatch = [...matchingIndices].reverse().find(index => selectedBenchIndices.includes(index));
-            if (lastSelectedMatch !== undefined) {
-              handleSelectTile(lastSelectedMatch);
-            }
-          }
-        }
-      }
+      event.preventDefault();
+      setSelectedRackIndices(current => {
+        const unselected = matchingIndices.find(index => !current.includes(index));
+        if (unselected !== undefined) return [...current, unselected];
+        const lastSelected = [...matchingIndices].reverse().find(index => current.includes(index));
+        return lastSelected === undefined ? current : current.filter(index => index !== lastSelected);
+      });
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [bench, selectedBenchIndices]);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, isYourTurn, pendingTiles, rackView, selectedRackIndices, snapshot]);
 
-  if (!gameInitialized) {
-    return <div className="loading">Initializing Scrabble Board...</div>;
-  }
+  const establishSession = (sessionToken: string, game: GameSnapshot) => {
+    localStorage.setItem(tokenStorageKey(game.gameId), sessionToken);
+    localStorage.setItem(tokenStorageKey(game.joinCode), sessionToken);
+    window.history.replaceState({}, "", `?game=${encodeURIComponent(game.gameId)}`);
+    setGameReference(game.gameId);
+    setToken(sessionToken);
+    setSnapshot(game);
+    setFeedback({ text: game.status === "waiting" ? "Game created. Share the invite link." : "Game ready.", type: "success" });
+  };
 
-  const handleSelectTile = (index: number) => {
-    if (bench[index] === null) return;
-    if (selectedBenchIndices.includes(index)) {
-      setSelectedBenchIndices(prev => prev.filter(i => i !== index));
-    } else {
-      setSelectedBenchIndices(prev => [...prev, index]);
+  const runAction = async (type: "play" | "exchange" | "pass" | "resign", extra: Record<string, unknown> = {}) => {
+    if (!snapshot || !token || busy) return;
+    setBusy(true);
+    try {
+      const next = await sendAction(snapshot.gameId, token, {
+        type,
+        expectedVersion: snapshot.version,
+        ...extra,
+      });
+      setSnapshot(next);
+      setFeedback({
+        text: type === "play" ? "Move accepted." : type === "exchange" ? "Tiles exchanged." : type === "pass" ? "Turn passed." : "Game resigned.",
+        type: "success",
+      });
+    } catch (error) {
+      setFeedback({ text: error instanceof Error ? error.message : "Action failed.", type: "error" });
+      try {
+        setSnapshot(await loadGame(snapshot.gameId, token));
+      } catch {
+        // Preserve the actionable error from the original request.
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
   const handleSquareClick = (r: number, c: number) => {
-    const square = board[r][c];
-
-    // Case 1: Clicking an occupied cell
-    if (square.letter !== null) {
-      if (square.isLocked) {
-        setFeedback({ text: "That tile was played in a previous turn and is locked.", type: "error" });
-        return;
-      }
-
-      // Recall the tile back to the bench
-      const tileInfo = placedTiles.find(t => t.r === r && t.c === c);
-      if (tileInfo) {
-        const newBoard = board.map((row, ri) =>
-          row.map((sq, ci) => (ri === r && ci === c ? { ...sq, letter: null, isBlank: false } : sq))
-        );
-        const newBench = [...bench];
-        newBench[tileInfo.originalIndex] = tileInfo.isBlank ? "?" : tileInfo.letter;
-
-        setBoard(newBoard);
-        setBench(newBench);
-        setPlacedTiles(prev => prev.filter(t => !(t.r === r && t.c === c)));
-        setSelectedBenchIndices(prev => prev.filter(i => i !== tileInfo.originalIndex));
-        setFeedback(null);
-      }
+    if (!snapshot || !isYourTurn || busy) return;
+    const existingPending = pendingTiles.find(tile => tile.r === r && tile.c === c);
+    if (existingPending) {
+      setPendingTiles(current => current.filter(tile => tile !== existingPending));
       return;
     }
-
-    // Case 2: Clicking an empty cell
-    if (selectedBenchIndices.length > 0) {
-      const indexToPlace = selectedBenchIndices[0];
-      const rackLetter = bench[indexToPlace];
-      if (!rackLetter) return;
-
-      const isBlank = rackLetter === "?" || rackLetter === "_" || rackLetter === " ";
-      let letterToPlace = rackLetter;
-      if (isBlank) {
-        const chosenLetter = window.prompt("Choose a letter for the blank tile (A-Z):")?.trim().toUpperCase();
-        if (!chosenLetter || !/^[A-Z]$/.test(chosenLetter)) {
-          setFeedback({ text: "Choose one letter from A to Z for the blank tile.", type: "error" });
-          return;
-        }
-        letterToPlace = chosenLetter;
+    if (snapshot.board[r][c].letter !== null || selectedRackIndices.length === 0) return;
+    const rackIndex = selectedRackIndices[0];
+    const rackLetter = rackDisplay[rackIndex];
+    if (!rackLetter) return;
+    const isBlank = rackLetter === "?";
+    let letter = rackLetter;
+    if (isBlank) {
+      const choice = window.prompt("Choose a letter for this blank (A-Z):")?.trim().toUpperCase();
+      if (!choice || !/^[A-Z]$/.test(choice)) {
+        setFeedback({ text: "A blank must represent one letter from A to Z.", type: "error" });
+        return;
       }
-
-      const newBoard = board.map((row, ri) =>
-        row.map((sq, ci) => (ri === r && ci === c ? { ...sq, letter: letterToPlace, isBlank } : sq))
-      );
-      const newBench = [...bench];
-      newBench[indexToPlace] = null;
-
-      const newTile: PlacedTileInfo = {
-        r,
-        c,
-        letter: letterToPlace,
-        originalIndex: indexToPlace,
-        isBlank
-      };
-
-      setBoard(newBoard);
-      setBench(newBench);
-      setPlacedTiles(prev => [...prev, newTile]);
-      setSelectedBenchIndices(prev => prev.filter(i => i !== indexToPlace));
-      setFeedback(null);
+      letter = choice;
     }
+    setPendingTiles(current => [...current, { r, c, letter, isBlank, originalIndex: rackIndex }]);
+    setSelectedRackIndices(current => current.filter(index => index !== rackIndex));
+    setFeedback(null);
   };
 
-  const handleRecallAll = () => {
-    if (placedTiles.length === 0) return;
-
-    const newBoard = board.map(row => row.map(sq => ({ ...sq })));
-    const newBench = [...bench];
-
-    placedTiles.forEach(t => {
-      newBoard[t.r][t.c].letter = null;
-      newBoard[t.r][t.c].isBlank = false;
-      newBench[t.originalIndex] = t.isBlank ? "?" : t.letter;
+  const submitMove = () => {
+    if (!pendingTiles.length) {
+      setFeedback({ text: "Place at least one tile first.", type: "error" });
+      return;
+    }
+    void runAction("play", {
+      placements: pendingTiles.map(({ r, c, letter, isBlank }) => ({ r, c, letter, isBlank })),
     });
-
-    setBoard(newBoard);
-    setBench(newBench);
-    setPlacedTiles([]);
-    setSelectedBenchIndices([]);
-    setFeedback({ text: "Recalled all pending tiles to your rack.", type: "info" });
   };
 
-  const handleShuffle = () => {
-    const activeLetters = bench.filter((l): l is string => l !== null);
-    
-    // Shuffle active letters
-    for (let i = activeLetters.length - 1; i > 0; i--) {
+  const exchangeTiles = () => {
+    const tiles = selectedRackIndices.map(index => rackDisplay[index]).filter((tile): tile is string => Boolean(tile));
+    if (!tiles.length) {
+      setFeedback({ text: "Select one or more rack tiles to exchange.", type: "error" });
+      return;
+    }
+    void runAction("exchange", { tiles });
+  };
+
+  const shuffleRack = () => {
+    if (pendingTiles.length) return;
+    const shuffled = [...rackView];
+    for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [activeLetters[i], activeLetters[j]] = [activeLetters[j], activeLetters[i]];
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-
-    const newBench: (string | null)[] = [...activeLetters];
-    while (newBench.length < 7) {
-      newBench.push(null);
-    }
-
-    setBench(newBench);
-    setSelectedBenchIndices([]);
+    setRackView(shuffled);
+    setSelectedRackIndices([]);
   };
 
-  const handleExchangeTile = () => {
-    if (selectedBenchIndices.length === 0) {
-      setFeedback({ text: "Please select one or more tiles on your bench to exchange.", type: "info" });
-      return;
-    }
+  if (!snapshot) {
+    return (
+      <Lobby
+        gameReference={gameReference}
+        busy={busy}
+        feedback={feedback}
+        onCreate={async (mode, name) => {
+          setBusy(true);
+          try {
+            const session = await createGame(mode, name);
+            establishSession(session.token, session.snapshot);
+          } catch (error) {
+            setFeedback({ text: error instanceof Error ? error.message : "Could not create game.", type: "error" });
+          } finally {
+            setBusy(false);
+          }
+        }}
+        onJoin={async (reference, name) => {
+          setBusy(true);
+          try {
+            const session = await joinGame(reference, name);
+            establishSession(session.token, session.snapshot);
+          } catch (error) {
+            setFeedback({ text: error instanceof Error ? error.message : "Could not join game.", type: "error" });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    );
+  }
 
-    if (tileBag.length < selectedBenchIndices.length) {
-      setFeedback({ text: `Not enough tiles in the bag. Only ${tileBag.length} left.`, type: "error" });
-      return;
-    }
-
-    // Extract selected tiles
-    const lettersToSwap = selectedBenchIndices.map(idx => bench[idx]).filter((l): l is string => l !== null);
-    const newBag = [...tileBag, ...lettersToSwap];
-    
-    // Shuffle newBag
-    for (let i = newBag.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newBag[i], newBag[j]] = [newBag[j], newBag[i]];
-    }
-
-    const newBench = [...bench];
-    selectedBenchIndices.forEach(idx => {
-      newBench[idx] = newBag.pop()!;
-    });
-
-    setTileBag(newBag);
-    setBench(newBench);
-    setSelectedBenchIndices([]);
-    setFeedback({ text: `Exchanged ${lettersToSwap.length} tile(s) for new ones. Turn passed.`, type: "success" });
-  };
-
-  const handleSubmitWord = async () => {
-    if (placedTiles.length === 0) {
-      setFeedback({ text: "Place some tiles on the board first!", type: "error" });
-      return;
-    }
-
-    const tilesToValidate: PlacedTile[] = placedTiles.map(t => ({
-      r: t.r,
-      c: t.c,
-      letter: t.letter,
-      isBlank: t.isBlank
-    }));
-
-    const result = validateAndScoreMove(board, tilesToValidate);
-
-    if (!result.success) {
-      setFeedback({ text: result.error!, type: "error" });
-      return;
-    }
-
-    // Check with standard dictionary API if the word is real
-    setFeedback({ text: "Validating words against dictionary...", type: "info" });
-    
-    try {
-      const words = result.words!;
-      const invalidWords: string[] = [];
-
-      for (const word of words) {
-        const isReal = await checkWordReal(word);
-        if (!isReal) {
-          invalidWords.push(word);
-        }
-      }
-
-      if (invalidWords.length > 0) {
-        setFeedback({
-          text: `Invalid play! The following word(s) are not real: ${invalidWords.join(", ")}`,
-          type: "error"
-        });
-        return;
-      }
-    } catch (err) {
-      console.error("Dictionary check failed", err);
-    }
-
-    // 1. Lock placed tiles
-    const newBoard = board.map(row => row.map(sq => ({ ...sq })));
-    placedTiles.forEach(t => {
-      newBoard[t.r][t.c].isLocked = true;
-    });
-
-    // 2. Replenish bench
-    const newBag = [...tileBag];
-    const newBench = bench.map(letter => {
-      if (letter === null && newBag.length > 0) {
-        return newBag.pop()!;
-      }
-      return letter;
-    });
-
-    // 3. Update States
-    setTotalScore(prev => prev + result.score!);
-    setPlayedWords(prev => [
-      { word: result.words!.join(", "), score: result.score! },
-      ...prev
-    ]);
-    setBoard(newBoard);
-    setTileBag(newBag);
-    setBench(newBench);
-    setPlacedTiles([]);
-    setSelectedBenchIndices([]);
-    setFeedback({
-      text: `Play confirmed! Word(s): ${result.words!.join(", ")} (+${result.score} pts)`,
-      type: "success"
-    });
-  };
-
-  const handleBotPlay = async () => {
-    // 1. First, recall any pending tiles to make sure we have a clean state and full bench
-    const tempBoard = board.map(row => row.map(sq => ({ ...sq })));
-    const tempBench = [...bench];
-    placedTiles.forEach(t => {
-      tempBoard[t.r][t.c].letter = null;
-      tempBoard[t.r][t.c].isBlank = false;
-      tempBench[t.originalIndex] = t.isBlank ? "?" : t.letter;
-    });
-
-    setFeedback({ text: "Bot is thinking... running compiled C++ GADDAG & Monte Carlo Solver...", type: "info" });
-    setRecommendation(null);
-    setHighlightedSquares([]);
-
-    const rackLetters = tempBench.filter((l): l is string => l !== null);
-
-    try {
-      const response = await fetch("http://localhost:5001/api/bot_move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          board: tempBoard,
-          rack: rackLetters,
-          bag: tileBag
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error("Server error or bot could not find a play.");
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        setFeedback({ text: `Bot chose to pass or found no moves! (${result.error || "No moves"})`, type: "error" });
-        return;
-      }
-
-      // Instead of playing it directly, save the recommendation state!
-      setRecommendation({
-        word: result.word,
-        r: result.r,
-        c: result.c,
-        direction: result.direction,
-        score: result.score,
-        ev: result.ev,
-        tilesPlaced: result.tilesPlaced
-      });
-
-      setFeedback({
-        text: `Bot recommends playing "${result.word}" for +${result.score} pts! See details in sidebar.`,
-        type: "success"
-      });
-
-    } catch (err) {
-      console.error("Bot play request failed:", err);
-      setFeedback({ text: "Failed to connect to Bot backend. Did you run: python3 backend/src/server.py?", type: "error" });
-    }
-  };
-
-  const handleToggleHighlight = () => {
-    if (!recommendation) return;
-    if (highlightedSquares.length > 0) {
-      setHighlightedSquares([]); // toggle off
-    } else {
-      const squaresToHighlight: { r: number; c: number }[] = [];
-      recommendation.tilesPlaced.forEach(tp => {
-        squaresToHighlight.push({ r: tp.r, c: tp.c });
-      });
-      setHighlightedSquares(squaresToHighlight);
-    }
-  };
-
-  const handleApplyRecommendation = () => {
-    if (!recommendation) return;
-
-    // 1. Recall any pending tiles to make sure we have a clean state and full bench
-    const tempBoard = board.map(row => row.map(sq => ({ ...sq })));
-    const tempBench = [...bench];
-    placedTiles.forEach(t => {
-      tempBoard[t.r][t.c].letter = null;
-      tempBoard[t.r][t.c].isBlank = false;
-      tempBench[t.originalIndex] = t.isBlank ? "?" : t.letter;
-    });
-
-    const newBoard = board.map(row => row.map(sq => ({ ...sq })));
-    // Wipe currently placed temporary tiles
-    placedTiles.forEach(t => {
-      newBoard[t.r][t.c].letter = null;
-      newBoard[t.r][t.c].isBlank = false;
-    });
-
-    const updatedBench = [...tempBench];
-    recommendation.tilesPlaced.forEach((tp: { r: number; c: number; letter: string; isBlank: boolean }) => {
-      const searchLetter = tp.isBlank ? "?" : tp.letter;
-      let indexToConsume = updatedBench.findIndex((l) => {
-        if (l === null) return false;
-        if (searchLetter === "?") return l === " " || l === "_" || l === "?";
-        return l.toUpperCase() === searchLetter.toUpperCase();
-      });
-
-      if (indexToConsume !== -1) {
-        updatedBench[indexToConsume] = null;
-      } else {
-        indexToConsume = updatedBench.findIndex(l => l !== null);
-        if (indexToConsume !== -1) {
-          updatedBench[indexToConsume] = null;
-        }
-      }
-
-      newBoard[tp.r][tp.c].letter = tp.letter;
-      newBoard[tp.r][tp.c].isBlank = tp.isBlank;
-      newBoard[tp.r][tp.c].isLocked = true;
-    });
-
-    const newBag = [...tileBag];
-    const finalBench = updatedBench.map(letter => {
-      if (letter === null && newBag.length > 0) {
-        return newBag.pop()!;
-      }
-      return letter;
-    });
-
-    setBoard(newBoard);
-    setTileBag(newBag);
-    setBench(finalBench);
-    setPlacedTiles([]);
-    setSelectedBenchIndices([]);
-    setTotalScore(prev => prev + recommendation.score);
-    setPlayedWords(prev => [
-      { word: `${recommendation.word} (Rec - ${recommendation.score} pts)`, score: recommendation.score },
-      ...prev
-    ]);
-    
-    setRecommendation(null);
-    setHighlightedSquares([]);
-    setFeedback({
-      text: `Applied recommendation! Played "${recommendation.word}" for +${recommendation.score} pts!`,
-      type: "success"
-    });
-  };
-
-  const handleDismissRecommendation = () => {
-    setRecommendation(null);
-    setHighlightedSquares([]);
-  };
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?game=${encodeURIComponent(snapshot.gameId)}`;
+  const statusMessage = snapshot.status === "waiting"
+    ? "Waiting for another player"
+    : snapshot.status === "finished"
+      ? snapshot.winner === null
+        ? `Game tied — ${snapshot.finishReason}`
+        : `${snapshot.players[snapshot.winner].name} won — ${snapshot.finishReason}`
+      : isYourTurn
+        ? "Your turn"
+        : `${snapshot.players[snapshot.activePlayer].name} is thinking`;
 
   return (
     <div className="game-container">
       <div className="game-layout">
-        
-        {/* Board column */}
         <div className="board-column">
           <div className="header-bar">
             <h1>Oh My Pi Scrabble</h1>
+            <div className="game-status-line">
+              <span className={`connection-dot ${connected ? "online" : "offline"}`} />
+              {statusMessage}
+            </div>
           </div>
-          
-          <Board board={board} onSquareClick={handleSquareClick} highlightedSquares={highlightedSquares} recommendedTiles={recommendation?.tilesPlaced} validWordSquares={validWordSquares} />
-          
+
+          <Board
+            board={displayBoard as Square[][]}
+            onSquareClick={handleSquareClick}
+            validWordSquares={validWordSquares}
+          />
+
           <div className="rack-area">
             <div className="rack-label">Your Rack</div>
             <Bench
-              bench={bench}
-              selectedBenchIndices={selectedBenchIndices}
-              onSelectTile={handleSelectTile}
+              bench={rackDisplay}
+              selectedBenchIndices={selectedRackIndices}
+              onSelectTile={index => {
+                if (!isYourTurn || rackDisplay[index] === null) return;
+                setSelectedRackIndices(current =>
+                  current.includes(index) ? current.filter(value => value !== index) : [...current, index],
+                );
+              }}
             />
           </div>
 
           <div className="control-panel">
-            <button className="btn btn-submit" onClick={handleSubmitWord}>
-              Play
-            </button>
-            <button className="btn btn-recall" onClick={handleRecallAll} disabled={placedTiles.length === 0}>
-              Recall
-            </button>
-            <button className="btn btn-shuffle" onClick={handleShuffle}>
-              Shuffle
-            </button>
-            <button className="btn btn-swap" onClick={handleExchangeTile} disabled={selectedBenchIndices.length === 0}>
-              Swap
-            </button>
-            <button className="btn btn-bot" onClick={handleBotPlay}>
-              Word Rec
-            </button>
+            <button className="btn btn-submit" onClick={submitMove} disabled={!isYourTurn || busy}>Play</button>
+            <button className="btn btn-recall" onClick={() => setPendingTiles([])} disabled={!pendingTiles.length || busy}>Recall</button>
+            <button className="btn btn-shuffle" onClick={shuffleRack} disabled={Boolean(pendingTiles.length) || busy}>Shuffle</button>
+            <button className="btn btn-swap" onClick={exchangeTiles} disabled={!isYourTurn || busy || Boolean(pendingTiles.length)}>Exchange</button>
+            <button className="btn btn-bot" onClick={() => void runAction("pass")} disabled={!isYourTurn || busy || Boolean(pendingTiles.length)}>Pass</button>
           </div>
         </div>
 
-        {/* Sidebar panel */}
         <div className="sidebar-column">
-          <div className="panel score-panel">
-            <h3>Player Score</h3>
-            <div className="total-score">{totalScore}</div>
-            <div className="bag-status">
-              Tiles in Bag: <strong>{tileBag.length}</strong>
-            </div>
+          <div className="panel players-panel">
+            <h3>Players</h3>
+            {snapshot.players.map((player, index) => (
+              <div className={`player-row ${snapshot.activePlayer === index && snapshot.status === "active" ? "active" : ""}`} key={index}>
+                <span>{player.name}{snapshot.you === index ? " (You)" : ""}</span>
+                <strong>{player.score}</strong>
+                <small>{player.tileCount} tiles</small>
+              </div>
+            ))}
+            <div className="bag-status">Tiles in Bag: <strong>{snapshot.bagCount}</strong></div>
           </div>
 
-          {recommendation && (
-            <div className="panel recommendation-panel" style={{ border: "2px solid #8e24aa", position: "relative" }}>
-              <h3 style={{ color: "#8e24aa", borderColor: "#e1bee7" }}>GADDAG Bot Recommend</h3>
-              <div className="rec-details" style={{ margin: "12px 0", textAlign: "left", fontSize: "14px" }}>
-                <div>Word: <strong style={{ color: "#6a1b9a", fontSize: "16px" }}>{recommendation.word}</strong></div>
-                <div>Score: <strong>+{recommendation.score} pts</strong></div>
-                <div>Direction: <strong>{recommendation.direction === 'H' ? 'Horizontal' : 'Vertical'}</strong></div>
-                <div>Start Square: <strong>Row {recommendation.r + 1}, Col {recommendation.c + 1}</strong></div>
-                <div>Estimated EV: <strong style={{ color: "#2e7d32" }}>{recommendation.ev}</strong></div>
-              </div>
-              <div className="rec-actions" style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-                <button 
-                  className={`btn ${highlightedSquares.length > 0 ? "btn-swap" : "btn-bot"}`} 
-                  onClick={handleToggleHighlight}
-                  style={{ padding: "8px 10px", fontSize: "12.5px" }}
-                >
-                  {highlightedSquares.length > 0 ? "Hide Play" : "Show Play"}
-                </button>
-                <button 
-                  className="btn btn-submit" 
-                  onClick={handleApplyRecommendation}
-                  style={{ padding: "8px 10px", fontSize: "12.5px" }}
-                >
-                  Apply Play
-                </button>
-                <button 
-                  className="btn btn-recall" 
-                  onClick={handleDismissRecommendation}
-                  style={{ padding: "8px 10px", fontSize: "12.5px" }}
-                >
-                  Dismiss
-                </button>
-              </div>
+          {snapshot.status === "waiting" && (
+            <div className="panel invite-panel">
+              <h3>Invite a Player</h3>
+              <p>Code: <strong>{snapshot.joinCode}</strong></p>
+              <input readOnly value={inviteUrl} />
+              <button className="btn btn-bot" onClick={() => navigator.clipboard.writeText(inviteUrl)}>Copy Invite Link</button>
             </div>
           )}
 
-          {feedback && (
-            <div className={`feedback-alert feedback-${feedback.type}`}>
-              {feedback.text}
-            </div>
-          )}
+          {feedback && <div className={`feedback-alert feedback-${feedback.type}`}>{feedback.text}</div>}
 
           <div className="panel word-log-panel">
-            <h3>Word History</h3>
-            {playedWords.length === 0 ? (
-              <p className="no-history">No words played yet.</p>
-            ) : (
+            <h3>Game History</h3>
+            {snapshot.moves.length === 0 ? <p className="no-history">No turns yet.</p> : (
               <div className="log-list">
-                {playedWords.map((log, index) => (
-                  <div key={index} className="log-item">
-                    <span className="log-word">{log.word}</span>
-                    <span className="log-points">+{log.score} pts</span>
+                {snapshot.moves.map(move => (
+                  <div className="log-item" key={move.turn}>
+                    <span className="log-word">
+                      {move.player}: {move.action === "play" ? move.words.join(", ") : move.action}
+                    </span>
+                    <span className="log-points">{move.score ? `+${move.score}` : "—"}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="panel instructions-panel">
-            <h3>How to Play</h3>
-            <ol>
-              <li>Click or press <strong>1-7</strong> to select/deselect letters on your rack.</li>
-              <li>Click an empty board square to place your selected letters in order.</li>
-              <li>To recall a placed letter, click it on the board.</li>
-              <li>Arrange tiles in a continuous straight line.</li>
-              <li>The first play of the game must cross the center star (★).</li>
-              <li>Subsequent plays must connect to existing tiles.</li>
-              <li>Select multiple tiles and click <strong>Swap Selected</strong> to exchange them!</li>
-            </ol>
+          <div className="panel game-actions-panel">
+            <button
+              className="btn btn-recall"
+              disabled={snapshot.status !== "active" || busy}
+              onClick={() => window.confirm("Resign this game?") && void runAction("resign")}
+            >Resign</button>
+            <button className="text-button" onClick={() => {
+              window.history.replaceState({}, "", window.location.pathname);
+              setSnapshot(null);
+              setGameReference(null);
+              setToken(null);
+            }}>Return to lobby</button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
 
+
+function Lobby({
+  gameReference,
+  busy,
+  feedback,
+  onCreate,
+  onJoin,
+}: {
+  gameReference: string | null;
+  busy: boolean;
+  feedback: Feedback | null;
+  onCreate: (mode: "human" | "bot", name: string) => Promise<void>;
+  onJoin: (reference: string, name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState(localStorage.getItem("scrabble:player-name") || "");
+  const [joinReference, setJoinReference] = useState(gameReference || "");
+  const rememberName = () => localStorage.setItem("scrabble:player-name", name.trim());
+
+  return (
+    <div className="lobby-shell">
+      <div className="lobby-card">
+        <h1>Oh My Pi Scrabble</h1>
+        <p>Play a private game with a friend or challenge the GADDAG bot.</p>
+        <label>
+          Display name
+          <input value={name} maxLength={30} onChange={event => setName(event.target.value)} placeholder="Your name" />
+        </label>
+        {gameReference ? (
+          <button className="btn btn-submit" disabled={busy || !name.trim()} onClick={() => {
+            rememberName();
+            void onJoin(gameReference, name);
+          }}>Join This Game</button>
+        ) : (
+          <div className="lobby-actions">
+            <button className="btn btn-submit" disabled={busy || !name.trim()} onClick={() => {
+              rememberName();
+              void onCreate("human", name);
+            }}>Create Friend Game</button>
+            <button className="btn btn-bot" disabled={busy || !name.trim()} onClick={() => {
+              rememberName();
+              void onCreate("bot", name);
+            }}>Play the Bot</button>
+          </div>
+        )}
+        {!gameReference && (
+          <div className="join-code-row">
+            <input value={joinReference} onChange={event => setJoinReference(event.target.value)} placeholder="Game code" />
+            <button className="btn btn-swap" disabled={busy || !name.trim() || !joinReference.trim()} onClick={() => {
+              rememberName();
+              void onJoin(joinReference.trim(), name);
+            }}>Join</button>
+          </div>
+        )}
+        {busy && <div className="feedback-alert feedback-info">Connecting…</div>}
+        {feedback && <div className={`feedback-alert feedback-${feedback.type}`}>{feedback.text}</div>}
       </div>
     </div>
   );
