@@ -11,6 +11,7 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 from rules import (
+    BOARD_MULTIPLIERS,
     RuleError,
     apply_move,
     create_bag,
@@ -69,6 +70,7 @@ class GameStore:
                     active_player INTEGER NOT NULL DEFAULT 0,
                     consecutive_scoreless INTEGER NOT NULL DEFAULT 0,
                     final_turns_remaining INTEGER NOT NULL DEFAULT -1,
+                    board_layout_version INTEGER NOT NULL DEFAULT 2,
                     version INTEGER NOT NULL DEFAULT 0,
                     winner INTEGER,
                     finish_reason TEXT,
@@ -95,6 +97,27 @@ class GameStore:
             if "final_turns_remaining" not in game_columns:
                 db.execute(
                     "ALTER TABLE games ADD COLUMN final_turns_remaining INTEGER NOT NULL DEFAULT -1"
+                )
+            if "board_layout_version" not in game_columns:
+                db.execute(
+                    "ALTER TABLE games ADD COLUMN board_layout_version INTEGER NOT NULL DEFAULT 1"
+                )
+            legacy_games = db.execute(
+                "SELECT id, board_json FROM games WHERE board_layout_version < 2"
+            ).fetchall()
+            for game in legacy_games:
+                board = self._load(game["board_json"])
+                for r, row in enumerate(board):
+                    for c, square in enumerate(row):
+                        square["multiplier"] = BOARD_MULTIPLIERS[r][c]
+                db.execute(
+                    """
+                    UPDATE games
+                    SET board_json = ?, board_layout_version = 2,
+                        version = version + 1, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (self._dump(board), utc_now(), game["id"]),
                 )
 
     @contextmanager

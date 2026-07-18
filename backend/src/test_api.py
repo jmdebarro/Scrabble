@@ -36,8 +36,14 @@ def run_tests():
             {"r": 7, "c": 8, "letter": "T", "isBlank": False},
         ],
     )
-    assert opening.words == ["AT"] and opening.score == 4
-    assert opening.modifiers == [{"r": 7, "c": 7, "multiplier": "double_word"}]
+    assert opening.words == ["AT"] and opening.score == 2
+    assert opening.modifiers == []
+    crossplay_board = create_board()
+    assert crossplay_board[0][0]["multiplier"] == "triple_letter"
+    assert crossplay_board[0][3]["multiplier"] == "triple_word"
+    assert crossplay_board[3][7]["multiplier"] == "double_word"
+    assert crossplay_board[7][0]["multiplier"] == "double_letter"
+    assert crossplay_board[7][7]["multiplier"] == "none"
 
     with TestClient(app) as client:
         assert client.get("/api/health").json() == {"status": "ok"}
@@ -107,7 +113,7 @@ def run_tests():
         )
         assert played.status_code == 200, played.text
         assert played.json()["moves"][0]["words"] == ["AT"]
-        assert played.json()["moves"][0]["modifiers"] == [{"r": 7, "c": 7, "multiplier": "double_word"}]
+        assert played.json()["moves"][0]["modifiers"] == []
         assert played.json()["status"] == "active"
         assert played.json()["finalTurnsRemaining"] == 2
         assert played.json()["activePlayer"] == 1
@@ -132,9 +138,19 @@ def run_tests():
         assert player_1_final.json()["finalTurnsRemaining"] == 0
         assert player_1_final.json()["finishReason"] == "final turns completed after bag emptied"
 
+        with store.transaction() as db:
+            stored_board = json.loads(
+                db.execute("SELECT board_json FROM games WHERE id = ?", (play_id,)).fetchone()[0]
+            )
+            stored_board[0][0]["multiplier"] = "triple_word"
+            db.execute(
+                "UPDATE games SET board_json = ?, board_layout_version = 1 WHERE id = ?",
+                (json.dumps(stored_board), play_id),
+            )
         persisted_store = GameStore(os.environ["SCRABBLE_DB_PATH"])
         persisted = persisted_store.get_snapshot(play_id, play_owner["token"])
         assert persisted["board"][7][7]["letter"] == "A"
+        assert persisted["board"][0][0]["multiplier"] == "triple_letter"
 
         pass_owner, pass_joiner = create_human_game(client)
         pass_id = pass_joiner["snapshot"]["gameId"]

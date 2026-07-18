@@ -93,28 +93,28 @@ h1, h2, h3, h4, h5 {
 
 /* Multiplier Cells */
 .double-letter {
-  background-color: #b3e5fc; /* Double Letter - Soft sky blue */
-  color: #01579b;
+  background-color: #f0ebc9;
+  color: #806138;
 }
 
 .triple-letter {
-  background-color: #0288d1; /* Triple Letter - Premium deep cobalt blue */
-  color: #ffffff;
+  background-color: #dce5cf;
+  color: #5f6c3d;
 }
 
 .double-word {
-  background-color: #ffcdd2; /* Double Word - Soft blush pink */
-  color: #b71c1c;
+  background-color: #d7dfed;
+  color: #48638f;
 }
 
 .triple-word {
-  background-color: #e53935; /* Triple Word - Premium rich crimson red */
-  color: #ffffff;
+  background-color: #e4dce7;
+  color: #ad2fba;
 }
 
 .center-star {
-  background-color: #ffcdd2; /* Blush pink */
-  color: #b71c1c;
+  background-color: #262626;
+  color: #ffffff;
   font-size: 18px;
 }
 

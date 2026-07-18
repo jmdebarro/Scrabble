@@ -41,21 +41,21 @@ const string TW = "TW"; // Triple Word
 const string NO = "none"; // Normal
 
 const string BOARD_MULTIPLIERS[15][15] = {
-    {TW, NO, NO, DL, NO, NO, NO, TW, NO, NO, NO, DL, NO, NO, TW},
-    {NO, DW, NO, NO, NO, TL, NO, NO, NO, TL, NO, NO, NO, DW, NO},
-    {NO, NO, DW, NO, NO, NO, DL, NO, DL, NO, NO, NO, DW, NO, NO},
-    {DL, NO, NO, DW, NO, NO, NO, DL, NO, NO, NO, DW, NO, NO, DL},
-    {NO, NO, NO, NO, DW, NO, NO, NO, NO, NO, DW, NO, NO, NO, NO},
-    {NO, TL, NO, NO, NO, TL, NO, NO, NO, TL, NO, NO, NO, TL, NO},
-    {NO, NO, DL, NO, NO, NO, DL, NO, DL, NO, NO, NO, DL, NO, NO},
+    {TL, NO, NO, TW, NO, NO, NO, DL, NO, NO, NO, TW, NO, NO, TL},
+    {NO, DW, NO, NO, NO, NO, TL, NO, TL, NO, NO, NO, NO, DW, NO},
+    {NO, NO, NO, NO, DL, NO, NO, NO, NO, NO, DL, NO, NO, NO, NO},
     {TW, NO, NO, DL, NO, NO, NO, DW, NO, NO, NO, DL, NO, NO, TW},
-    {NO, NO, DL, NO, NO, NO, DL, NO, DL, NO, NO, NO, DL, NO, NO},
-    {NO, TL, NO, NO, NO, TL, NO, NO, NO, TL, NO, NO, NO, TL, NO},
-    {NO, NO, NO, NO, DW, NO, NO, NO, NO, NO, DW, NO, NO, NO, NO},
-    {DL, NO, NO, DW, NO, NO, NO, DL, NO, NO, NO, DW, NO, NO, DL},
-    {NO, NO, DW, NO, NO, NO, DL, NO, DL, NO, NO, NO, DW, NO, NO},
-    {NO, DW, NO, NO, NO, TL, NO, NO, NO, TL, NO, NO, NO, DW, NO},
-    {TW, NO, NO, DL, NO, NO, NO, TW, NO, NO, NO, DL, NO, NO, TW}
+    {NO, NO, DL, NO, NO, TL, NO, NO, NO, TL, NO, NO, DL, NO, NO},
+    {NO, NO, NO, NO, TL, NO, NO, DL, NO, NO, TL, NO, NO, NO, NO},
+    {NO, TL, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, TL, NO},
+    {DL, NO, NO, DW, NO, DL, NO, NO, NO, DL, NO, DW, NO, NO, DL},
+    {NO, TL, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, TL, NO},
+    {NO, NO, NO, NO, TL, NO, NO, DL, NO, NO, TL, NO, NO, NO, NO},
+    {NO, NO, DL, NO, NO, TL, NO, NO, NO, TL, NO, NO, DL, NO, NO},
+    {TW, NO, NO, DL, NO, NO, NO, DW, NO, NO, NO, DL, NO, NO, TW},
+    {NO, NO, NO, NO, DL, NO, NO, NO, NO, NO, DL, NO, NO, NO, NO},
+    {NO, DW, NO, NO, NO, NO, TL, NO, TL, NO, NO, NO, NO, DW, NO},
+    {TL, NO, NO, TW, NO, NO, NO, DL, NO, NO, NO, TW, NO, NO, TL}
 };
 
 // Static rack leave values inspired by tournament engine equities

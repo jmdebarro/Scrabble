@@ -40,21 +40,21 @@ const DL = Multiplier.double_letter;
 const N = Multiplier.none;
 
 const BOARD_LAYOUT: Multiplier[][] = [
-  [T,  N,  N,  DL, N,  N,  N,  T,  N,  N,  N,  DL, N,  N,  T],
-  [N,  D,  N,  N,  N,  TL, N,  N,  N,  TL, N,  N,  N,  D,  N],
-  [N,  N,  D,  N,  N,  N,  DL, N,  DL, N,  N,  N,  D,  N,  N],
-  [DL, N,  N,  D,  N,  N,  N,  DL, N,  N,  N,  D,  N,  N,  DL],
-  [N,  N,  N,  N,  D,  N,  N,  N,  N,  N,  D,  N,  N,  N,  N],
-  [N,  TL, N,  N,  N,  TL, N,  N,  N,  TL, N,  N,  N,  TL, N],
-  [N,  N,  DL, N,  N,  N,  DL, N,  DL, N,  N,  N,  DL, N,  N],
+  [TL, N,  N,  T,  N,  N,  N,  DL, N,  N,  N,  T,  N,  N,  TL],
+  [N,  D,  N,  N,  N,  N,  TL, N,  TL, N,  N,  N,  N,  D,  N],
+  [N,  N,  N,  N,  DL, N,  N,  N,  N,  N,  DL, N,  N,  N,  N],
   [T,  N,  N,  DL, N,  N,  N,  D,  N,  N,  N,  DL, N,  N,  T],
-  [N,  N,  DL, N,  N,  N,  DL, N,  DL, N,  N,  N,  DL, N,  N],
-  [N,  TL, N,  N,  N,  TL, N,  N,  N,  TL, N,  N,  N,  TL, N],
-  [N,  N,  N,  N,  D,  N,  N,  N,  N,  N,  D,  N,  N,  N,  N],
-  [DL, N,  N,  D,  N,  N,  N,  DL, N,  N,  N,  D,  N,  N,  DL],
-  [N,  N,  D,  N,  N,  N,  DL, N,  DL, N,  N,  N,  D,  N,  N],
-  [N,  D,  N,  N,  N,  TL, N,  N,  N,  TL, N,  N,  N,  D,  N],
-  [T,  N,  N,  DL, N,  N,  N,  T,  N,  N,  N,  DL, N,  N,  T],
+  [N,  N,  DL, N,  N,  TL, N,  N,  N,  TL, N,  N,  DL, N,  N],
+  [N,  N,  N,  N,  TL, N,  N,  DL, N,  N,  TL, N,  N,  N,  N],
+  [N,  TL, N,  N,  N,  N,  N,  N,  N,  N,  N,  N,  N,  TL, N],
+  [DL, N,  N,  D,  N,  DL, N,  N,  N,  DL, N,  D,  N,  N,  DL],
+  [N,  TL, N,  N,  N,  N,  N,  N,  N,  N,  N,  N,  N,  TL, N],
+  [N,  N,  N,  N,  TL, N,  N,  DL, N,  N,  TL, N,  N,  N,  N],
+  [N,  N,  DL, N,  N,  TL, N,  N,  N,  TL, N,  N,  DL, N,  N],
+  [T,  N,  N,  DL, N,  N,  N,  D,  N,  N,  N,  DL, N,  N,  T],
+  [N,  N,  N,  N,  DL, N,  N,  N,  N,  N,  DL, N,  N,  N,  N],
+  [N,  D,  N,  N,  N,  N,  TL, N,  TL, N,  N,  N,  N,  D,  N],
+  [TL, N,  N,  T,  N,  N,  N,  DL, N,  N,  N,  T,  N,  N,  TL],
 ];
 
 export function createBoard(): Square[][] {
