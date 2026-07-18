@@ -178,7 +178,7 @@ def run_tests():
         bot_snapshot = bot_turn.json()
         assert len(bot_snapshot["moves"]) == 2
         assert bot_snapshot["activePlayer"] == 0 or bot_snapshot["status"] == "finished"
-        assert bot_snapshot["moves"][0]["player"] == "GADDAG Bot"
+        assert bot_snapshot["moves"][0]["player"] == "Bot"
 
     solver_pool.close()
     temporary_directory.cleanup()

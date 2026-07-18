@@ -390,6 +390,21 @@ export default function ScrabbleGame() {
     setSelectedRackIndices([]);
   };
 
+  const returnToLobby = () => {
+    window.history.replaceState({}, "", window.location.pathname);
+    lastSnapshotKey.current = null;
+    setSnapshot(null);
+    setRackView([]);
+    setPendingTiles([]);
+    setSelectedRackIndices([]);
+    setBlankPlacement(null);
+    animatedMoveKey.current = null;
+    setFallingTiles([]);
+    setGameReference(null);
+    setToken(null);
+    setFeedback(null);
+  };
+
   if (!snapshot) {
     return (
       <Lobby
@@ -463,7 +478,12 @@ export default function ScrabbleGame() {
             {snapshot.players.map((player, index) => (
               <div className={`player-row ${snapshot.activePlayer === index && snapshot.status === "active" ? "active" : ""}`} key={index}>
                 <span>{player.name}{snapshot.you === index ? " (You)" : ""}</span>
-                <strong>{player.score}</strong>
+                <div className="player-score-area">
+                  {snapshot.finalTurnsRemaining > 0 && isYourTurn && snapshot.you === index && (
+                    <span className="last-turn-badge">Last turn</span>
+                  )}
+                  <strong>{player.score}</strong>
+                </div>
                 <small>{player.tileCount} tiles</small>
               </div>
             ))}
@@ -502,26 +522,16 @@ export default function ScrabbleGame() {
             )}
           </div>
 
-          <div className="panel game-actions-panel">
-            <button
-              className="btn btn-recall"
-              disabled={snapshot.status !== "active" || busy}
-              onClick={() => window.confirm("Resign this game?") && void runAction("resign")}
-            >Resign</button>
-            <button className="btn btn-shuffle" onClick={() => {
-              window.history.replaceState({}, "", window.location.pathname);
-              lastSnapshotKey.current = null;
-              setSnapshot(null);
-              setRackView([]);
-              setPendingTiles([]);
-              setSelectedRackIndices([]);
-              setBlankPlacement(null);
-              animatedMoveKey.current = null;
-              setFallingTiles([]);
-              setGameReference(null);
-              setToken(null);
-            }}>Return to lobby</button>
-          </div>
+          {snapshot.status !== "finished" && (
+            <div className="panel game-actions-panel">
+              <button
+                className="btn btn-recall"
+                disabled={snapshot.status !== "active" || busy}
+                onClick={() => window.confirm("Resign this game?") && void runAction("resign")}
+              >Resign</button>
+              <button className="btn btn-shuffle" onClick={returnToLobby}>Return to lobby</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -552,7 +562,68 @@ export default function ScrabbleGame() {
           </div>
         </div>
       )}
+
+      {snapshot.status === "finished" && fallingTiles.length === 0 && (
+        <GameResult
+          result={snapshot.winner === null ? "draw" : snapshot.winner === snapshot.you ? "victory" : "defeat"}
+          yourScore={snapshot.players[snapshot.you].score}
+          opponentScore={snapshot.players[1 - snapshot.you].score}
+          onReturnToLobby={returnToLobby}
+        />
+      )}
     </div>
+  );
+}
+
+
+function GameResult({
+  result,
+  yourScore,
+  opponentScore,
+  onReturnToLobby,
+}: {
+  result: "victory" | "defeat" | "draw";
+  yourScore: number;
+  opponentScore: number;
+  onReturnToLobby: () => void;
+}) {
+  const title = result === "victory" ? "Victory" : result === "defeat" ? "Defeat" : "Draw";
+  return (
+    <div className="game-result-backdrop">
+      <div className={`game-result-card result-${result}`} role="dialog" aria-modal="true" aria-labelledby="game-result-title">
+        <div className="game-result-icon"><ResultIcon result={result} /></div>
+        <span className="game-result-eyebrow">Game complete</span>
+        <h2 id="game-result-title">{title}</h2>
+        <p className="game-result-score">{yourScore} <span>—</span> {opponentScore}</p>
+        <button className="btn result-return-button" type="button" autoFocus onClick={onReturnToLobby}>
+          Return to lobby
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+function ResultIcon({ result }: { result: "victory" | "defeat" | "draw" }) {
+  if (result === "victory") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M20 10h24v9c0 11-5 18-12 18S20 30 20 19V10Z" />
+        <path d="M20 15H10v5c0 8 5 13 12 13M44 15h10v5c0 8-5 13-12 13M32 37v10M25 47h14v7M20 54h24" />
+      </svg>
+    );
+  }
+  if (result === "defeat") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M18 54V10M20 12h29l-8 10 8 10H20M11 54h20" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M14 22h36M14 42h36" />
+    </svg>
   );
 }
 

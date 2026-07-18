@@ -119,6 +119,16 @@ class GameStore:
                     """,
                     (self._dump(board), utc_now(), game["id"]),
                 )
+            db.execute(
+                "UPDATE games SET player_2_name = 'Bot' WHERE mode = 'bot' AND player_2_name = 'GADDAG Bot'"
+            )
+            db.execute(
+                """
+                UPDATE moves SET player_name = 'Bot'
+                WHERE player_name = 'GADDAG Bot'
+                  AND game_id IN (SELECT id FROM games WHERE mode = 'bot')
+                """
+            )
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -150,7 +160,7 @@ class GameStore:
         player_2_name = None
         if mode == "bot":
             draw_tiles(bag, rack_2)
-            player_2_name = "GADDAG Bot"
+            player_2_name = "Bot"
             status = "active"
         now = utc_now()
         with self.transaction() as db:
