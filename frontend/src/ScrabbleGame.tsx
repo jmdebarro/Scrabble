@@ -757,7 +757,7 @@ function Lobby({
             <button className="btn btn-submit" disabled={busy || !name.trim()} onClick={() => {
               rememberName();
               void onCreate("human", name);
-            }}>Create Friend Game</button>
+            }}>Play a Friend</button>
             <button className="btn btn-bot" disabled={busy || !name.trim()} onClick={() => {
               rememberName();
               void onCreate("bot", name);
