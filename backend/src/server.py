@@ -249,9 +249,12 @@ async def game_events(
         await manager.disconnect(game_id, websocket)
 
 
-def run_server(port: int = 5001) -> None:
-    uvicorn.run(app, host="0.0.0.0", port=port)
+def run_server(port: int = 5001, host: str = "127.0.0.1") -> None:
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
-    run_server(int(os.environ.get("PORT", "5001")))
+    run_server(
+        int(os.environ.get("SCRABBLE_PORT", os.environ.get("PORT", "5001"))),
+        os.environ.get("SCRABBLE_HOST", "127.0.0.1"),
+    )
