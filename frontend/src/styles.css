@@ -93,27 +93,35 @@ h1, h2, h3, h4, h5 {
 
 /* Multiplier Cells */
 .double-letter {
-  background-color: #f0ebc9;
-  color: #806138;
+  background-color: #dfb84f;
+  color: #4d3415;
 }
 
 .triple-letter {
-  background-color: #dce5cf;
-  color: #5f6c3d;
+  background-color: #7f9850;
+  color: #fffdf2;
 }
 
 .double-word {
-  background-color: #d7dfed;
-  color: #48638f;
+  background-color: #5f7da9;
+  color: #ffffff;
 }
 
 .triple-word {
-  background-color: #e4dce7;
-  color: #ad2fba;
+  background-color: #9d3eaa;
+  color: #ffffff;
+}
+
+.double-letter,
+.triple-letter,
+.double-word,
+.triple-word {
+  box-shadow: inset 0 0 0 1px rgba(62, 39, 35, 0.14);
+  text-shadow: 0 1px 1px rgba(62, 39, 35, 0.22);
 }
 
 .center-star {
-  background-color: #262626;
+  background-color: #302522;
   color: #ffffff;
   font-size: 18px;
 }
