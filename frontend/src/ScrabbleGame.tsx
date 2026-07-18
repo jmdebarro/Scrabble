@@ -230,6 +230,14 @@ export default function ScrabbleGame() {
       const activeTag = document.activeElement?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
 
+      if (event.key === "Escape") {
+        if (pendingTiles.length > 0) {
+          event.preventDefault();
+          setPendingTiles([]);
+        }
+        return;
+      }
+
       if (event.key === "Backspace") {
         if (selectedRackIndices.length > 0) {
           event.preventDefault();
