@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Board from "./Board";
 import Bench from "./Bench";
+import Letter from "./Letter";
 import { loadWords, validateAndScoreMove, type PlacedTile, type Square } from "./boardLogic";
 import {
   createGame,
@@ -42,6 +43,14 @@ interface FallingTile {
   order: number;
 }
 
+interface BlankPlacement {
+  r: number;
+  c: number;
+  rackIndex: number;
+}
+
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
 
 export default function ScrabbleGame() {
   const initialReference = new URLSearchParams(window.location.search).get("game");
@@ -57,8 +66,8 @@ export default function ScrabbleGame() {
   const [scorePreview, setScorePreview] = useState<ScorePreview | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState(false);
-  const [connected, setConnected] = useState(false);
   const [fallingTiles, setFallingTiles] = useState<FallingTile[]>([]);
+  const [blankPlacement, setBlankPlacement] = useState<BlankPlacement | null>(null);
   const lastSnapshotKey = useRef<string | null>(null);
   const animatedMoveKey = useRef<string | null>(null);
   const fallingTilesTimer = useRef<number | null>(null);
@@ -91,6 +100,7 @@ export default function ScrabbleGame() {
       setRackView(snapshot.rack);
       setPendingTiles([]);
       setSelectedRackIndices([]);
+      setBlankPlacement(null);
       lastSnapshotKey.current = snapshotKey;
     }
   }, [snapshot]);
@@ -127,13 +137,11 @@ export default function ScrabbleGame() {
 
     const connect = () => {
       socket = new WebSocket(websocketUrl(snapshot.gameId, token));
-      socket.onopen = () => setConnected(true);
       socket.onmessage = event => {
         const message = JSON.parse(event.data);
         if (message.type === "game_state") setSnapshot(message.snapshot);
       };
       socket.onclose = () => {
-        setConnected(false);
         if (!stopped) reconnectTimer = window.setTimeout(connect, 1500);
       };
       socket.onerror = () => socket?.close();
@@ -157,8 +165,8 @@ export default function ScrabbleGame() {
     return board;
   }, [snapshot, pendingTiles]);
 
-  const rackDisplay = rackView.map((letter, index) =>
-    pendingTiles.some(tile => tile.originalIndex === index) ? null : letter,
+  const rackDisplay = Array.from({ length: 7 }, (_, index) =>
+    pendingTiles.some(tile => tile.originalIndex === index) ? null : rackView[index] ?? null,
   );
   const isYourTurn = snapshot?.status === "active" && snapshot.activePlayer === snapshot.you;
 
@@ -211,6 +219,13 @@ export default function ScrabbleGame() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (blankPlacement) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setBlankPlacement(null);
+        }
+        return;
+      }
       if (!snapshot || !isYourTurn || busy) return;
       const activeTag = document.activeElement?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
@@ -264,7 +279,7 @@ export default function ScrabbleGame() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [busy, isYourTurn, pendingTiles, rackView, selectedRackIndices, snapshot]);
+  }, [blankPlacement, busy, isYourTurn, pendingTiles, rackView, selectedRackIndices, snapshot]);
 
   const establishSession = (sessionToken: string, game: GameSnapshot) => {
     localStorage.setItem(tokenStorageKey(game.gameId), sessionToken);
@@ -276,6 +291,7 @@ export default function ScrabbleGame() {
     setRackView(game.rack);
     setPendingTiles([]);
     setSelectedRackIndices([]);
+    setBlankPlacement(null);
     animatedMoveKey.current = null;
     setFallingTiles([]);
     setSnapshot(game);
@@ -320,17 +336,27 @@ export default function ScrabbleGame() {
     const rackLetter = rackDisplay[rackIndex];
     if (!rackLetter) return;
     const isBlank = rackLetter === "?";
-    let letter = rackLetter;
     if (isBlank) {
-      const choice = window.prompt("Choose a letter for this blank (A-Z):")?.trim().toUpperCase();
-      if (!choice || !/^[A-Z]$/.test(choice)) {
-        setFeedback({ text: "A blank must represent one letter from A to Z.", type: "error" });
-        return;
-      }
-      letter = choice;
+      setBlankPlacement({ r, c, rackIndex });
+      setFeedback(null);
+      return;
     }
-    setPendingTiles(current => [...current, { r, c, letter, isBlank, originalIndex: rackIndex }]);
+    setPendingTiles(current => [...current, { r, c, letter: rackLetter, isBlank: false, originalIndex: rackIndex }]);
     setSelectedRackIndices(current => current.filter(index => index !== rackIndex));
+    setFeedback(null);
+  };
+
+  const chooseBlankLetter = (letter: string) => {
+    if (!blankPlacement) return;
+    setPendingTiles(current => [...current, {
+      r: blankPlacement.r,
+      c: blankPlacement.c,
+      letter,
+      isBlank: true,
+      originalIndex: blankPlacement.rackIndex,
+    }]);
+    setSelectedRackIndices(current => current.filter(index => index !== blankPlacement.rackIndex));
+    setBlankPlacement(null);
     setFeedback(null);
   };
 
@@ -397,28 +423,10 @@ export default function ScrabbleGame() {
   }
 
   const inviteUrl = `${window.location.origin}${window.location.pathname}?game=${encodeURIComponent(snapshot.gameId)}`;
-  const statusMessage = snapshot.status === "waiting"
-    ? "Waiting for another player"
-    : snapshot.status === "finished"
-      ? snapshot.winner === null
-        ? `Game tied — ${snapshot.finishReason}`
-        : `${snapshot.players[snapshot.winner].name} won — ${snapshot.finishReason}`
-      : isYourTurn
-        ? "Your turn"
-        : `${snapshot.players[snapshot.activePlayer].name} is thinking`;
-
   return (
     <div className="game-container">
       <div className="game-layout">
         <div className="board-column">
-          <div className="header-bar">
-            <h1>Oh My Pi Scrabble</h1>
-            <div className="game-status-line">
-              <span className={`connection-dot ${connected ? "online" : "offline"}`} />
-              {statusMessage}
-            </div>
-          </div>
-
           <Board
             board={displayBoard as Square[][]}
             onSquareClick={handleSquareClick}
@@ -509,6 +517,7 @@ export default function ScrabbleGame() {
               setRackView([]);
               setPendingTiles([]);
               setSelectedRackIndices([]);
+              setBlankPlacement(null);
               animatedMoveKey.current = null;
               setFallingTiles([]);
               setGameReference(null);
@@ -517,6 +526,34 @@ export default function ScrabbleGame() {
           </div>
         </div>
       </div>
+
+      {blankPlacement && (
+        <div className="blank-picker-backdrop" onMouseDown={event => {
+          if (event.target === event.currentTarget) setBlankPlacement(null);
+        }}>
+          <div className="blank-picker" role="dialog" aria-modal="true" aria-labelledby="blank-picker-title">
+            <h2 id="blank-picker-title">Choose a letter</h2>
+            <p>This blank remains worth 0 points.</p>
+            <div className="blank-letter-grid">
+              {ALPHABET.map((letter, index) => (
+                <button
+                  className="blank-letter-option"
+                  key={letter}
+                  type="button"
+                  aria-label={`Use ${letter} for the blank tile`}
+                  autoFocus={index === 0}
+                  onClick={() => chooseBlankLetter(letter)}
+                >
+                  <Letter letter={letter} value={0} isSelected={false} />
+                </button>
+              ))}
+            </div>
+            <button className="btn btn-recall blank-picker-cancel" type="button" onClick={() => setBlankPlacement(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

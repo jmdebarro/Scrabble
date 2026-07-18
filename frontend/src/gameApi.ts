@@ -30,6 +30,7 @@ export interface GameSnapshot {
   activePlayer: number;
   players: PlayerSummary[];
   consecutiveScoreless: number;
+  finalTurnsRemaining: number;
   moves: MoveSummary[];
   winner: number | null;
   finishReason: string | null;

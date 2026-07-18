@@ -91,7 +91,7 @@ def run_tests():
         with store.transaction() as db:
             db.execute(
                 "UPDATE games SET rack_1_json = ?, rack_2_json = ?, bag_json = ? WHERE id = ?",
-                (json.dumps(["A", "T"]), json.dumps(["E"]), json.dumps([]), play_id),
+                (json.dumps(["A", "T"]), json.dumps(["E"]), json.dumps(["Z"]), play_id),
             )
         played = client.post(
             f"/api/games/{play_id}/actions",
@@ -108,7 +108,29 @@ def run_tests():
         assert played.status_code == 200, played.text
         assert played.json()["moves"][0]["words"] == ["AT"]
         assert played.json()["moves"][0]["modifiers"] == [{"r": 7, "c": 7, "multiplier": "double_word"}]
-        assert played.json()["status"] == "finished"
+        assert played.json()["status"] == "active"
+        assert played.json()["finalTurnsRemaining"] == 2
+        assert played.json()["activePlayer"] == 1
+
+        player_2_final = client.post(
+            f"/api/games/{play_id}/actions",
+            headers={"X-Player-Token": play_joiner["token"]},
+            json={"type": "pass", "expectedVersion": played.json()["version"]},
+        )
+        assert player_2_final.status_code == 200, player_2_final.text
+        assert player_2_final.json()["status"] == "active"
+        assert player_2_final.json()["finalTurnsRemaining"] == 1
+        assert player_2_final.json()["activePlayer"] == 0
+
+        player_1_final = client.post(
+            f"/api/games/{play_id}/actions",
+            headers={"X-Player-Token": play_owner["token"]},
+            json={"type": "pass", "expectedVersion": player_2_final.json()["version"]},
+        )
+        assert player_1_final.status_code == 200, player_1_final.text
+        assert player_1_final.json()["status"] == "finished"
+        assert player_1_final.json()["finalTurnsRemaining"] == 0
+        assert player_1_final.json()["finishReason"] == "final turns completed after bag emptied"
 
         persisted_store = GameStore(os.environ["SCRABBLE_DB_PATH"])
         persisted = persisted_store.get_snapshot(play_id, play_owner["token"])

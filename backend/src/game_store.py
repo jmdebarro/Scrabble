@@ -68,6 +68,7 @@ class GameStore:
                     score_2 INTEGER NOT NULL DEFAULT 0,
                     active_player INTEGER NOT NULL DEFAULT 0,
                     consecutive_scoreless INTEGER NOT NULL DEFAULT 0,
+                    final_turns_remaining INTEGER NOT NULL DEFAULT -1,
                     version INTEGER NOT NULL DEFAULT 0,
                     winner INTEGER,
                     finish_reason TEXT,
@@ -90,6 +91,11 @@ class GameStore:
                 CREATE INDEX IF NOT EXISTS moves_game_turn_idx ON moves(game_id, turn_number);
                 """
             )
+            game_columns = {column["name"] for column in db.execute("PRAGMA table_info(games)")}
+            if "final_turns_remaining" not in game_columns:
+                db.execute(
+                    "ALTER TABLE games ADD COLUMN final_turns_remaining INTEGER NOT NULL DEFAULT -1"
+                )
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -212,8 +218,6 @@ class GameStore:
                         "words": evaluation.words,
                         "modifiers": evaluation.modifiers,
                     }
-                    if not state["bag"] and not state["racks"][player_index]:
-                        self._finish_went_out(state, player_index)
                 elif action == "exchange":
                     tiles = payload.get("tiles", [])
                     if not isinstance(tiles, list) or not 1 <= len(tiles) <= 7:
@@ -240,7 +244,19 @@ class GameStore:
             except RuleError as exc:
                 raise GameError(str(exc)) from exc
 
-            if state["status"] == "active" and scoreless and state["consecutive"] >= 6:
+            if state["status"] == "active" and state["final_turns"] < 0 and not state["bag"]:
+                state["final_turns"] = 2
+            elif state["status"] == "active" and state["final_turns"] > 0:
+                state["final_turns"] -= 1
+                if state["final_turns"] == 0:
+                    self._finish_final_round(state)
+
+            if (
+                state["status"] == "active"
+                and state["final_turns"] < 0
+                and scoreless
+                and state["consecutive"] >= 6
+            ):
                 self._finish_scoreless(state)
             if state["status"] == "active":
                 state["active"] = 1 - player_index
@@ -262,6 +278,7 @@ class GameStore:
                 """
                 UPDATE games SET board_json = ?, bag_json = ?, rack_1_json = ?, rack_2_json = ?,
                     score_1 = ?, score_2 = ?, active_player = ?, consecutive_scoreless = ?,
+                    final_turns_remaining = ?,
                     status = ?, winner = ?, finish_reason = ?, version = ?, updated_at = ?
                 WHERE id = ?
                 """,
@@ -269,6 +286,7 @@ class GameStore:
                     self._dump(state["board"]), self._dump(state["bag"]),
                     self._dump(state["racks"][0]), self._dump(state["racks"][1]),
                     state["scores"][0], state["scores"][1], state["active"], state["consecutive"],
+                    state["final_turns"],
                     state["status"], state["winner"], state["finish_reason"], next_version, utc_now(), row["id"],
                 ),
             )
@@ -316,7 +334,8 @@ class GameStore:
             "status": row["status"], "version": row["version"], "board": self._load(row["board_json"]),
             "bagCount": len(self._load(row["bag_json"])), "rack": self._load(row[f"rack_{player_index + 1}_json"]),
             "you": player_index, "activePlayer": row["active_player"], "players": players,
-            "consecutiveScoreless": row["consecutive_scoreless"], "moves": history,
+            "consecutiveScoreless": row["consecutive_scoreless"],
+            "finalTurnsRemaining": max(row["final_turns_remaining"], 0), "moves": history,
             "winner": row["winner"], "finishReason": row["finish_reason"],
             "updatedAt": row["updated_at"],
         }
@@ -327,8 +346,21 @@ class GameStore:
             "racks": [self._load(row["rack_1_json"]), self._load(row["rack_2_json"])],
             "scores": [row["score_1"], row["score_2"]], "active": row["active_player"],
             "consecutive": row["consecutive_scoreless"], "status": row["status"],
+            "final_turns": row["final_turns_remaining"],
             "winner": row["winner"], "finish_reason": row["finish_reason"],
         }
+
+    @classmethod
+    def _finish_final_round(cls, state: dict[str, Any]) -> None:
+        empty_racks = [index for index, rack in enumerate(state["racks"]) if not rack]
+        if len(empty_racks) == 1:
+            cls._finish_went_out(state, empty_racks[0])
+        else:
+            state["scores"][0] -= rack_value(state["racks"][0])
+            state["scores"][1] -= rack_value(state["racks"][1])
+            state["status"] = "finished"
+            state["winner"] = 0 if state["scores"][0] > state["scores"][1] else 1 if state["scores"][1] > state["scores"][0] else None
+        state["finish_reason"] = "final turns completed after bag emptied"
 
     @staticmethod
     def _finish_went_out(state: dict[str, Any], player_index: int) -> None:
