@@ -955,13 +955,16 @@ h1, h2, h3, h4, h5 {
   }
 
   .square .letter-text {
-    font-size: clamp(10px, 3.2vw, 14px);
+    font-size: clamp(9px, 2.8vw, 12px);
+    line-height: 1;
+    transform: translate(-1px, -1px);
   }
 
   .square .letter-value {
-    right: 2px;
-    bottom: 1px;
-    font-size: 6px;
+    right: 1px;
+    bottom: 0;
+    font-size: 5px;
+    line-height: 1;
   }
 
   .multiplier-label {
