@@ -148,7 +148,6 @@ class GameStore:
             raise GameError("Mode must be human or bot.")
         name = self._clean_name(player_name)
         game_id = str(uuid4())
-        join_code = secrets.token_hex(4).upper()
         player_token = secrets.token_urlsafe(32)
         bot_token = f"bot:{secrets.token_urlsafe(24)}" if mode == "bot" else None
         bag = create_bag()
@@ -164,6 +163,7 @@ class GameStore:
             status = "active"
         now = utc_now()
         with self.transaction() as db:
+            join_code = self._new_join_code(db)
             db.execute(
                 """
                 INSERT INTO games (
@@ -179,6 +179,17 @@ class GameStore:
                 ),
             )
         return {"token": player_token, "snapshot": self.get_snapshot(game_id, player_token)}
+
+    @staticmethod
+    def _new_join_code(db: sqlite3.Connection) -> str:
+        # Collisions are rare, but they should never surface as an internal
+        # SQLite error to a player creating a game.
+        for _ in range(20):
+            candidate = secrets.token_hex(4).upper()
+            exists = db.execute("SELECT 1 FROM games WHERE join_code = ?", (candidate,)).fetchone()
+            if exists is None:
+                return candidate
+        raise GameError("Could not allocate a game code; try again.", 503)
 
     def join_game(self, game_reference: str, player_name: str) -> dict[str, Any]:
         name = self._clean_name(player_name)

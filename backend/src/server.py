@@ -9,7 +9,7 @@ from typing import Any, Literal
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from game_store import GameError, GameStore
 from solver_pool import SolverError, SolverPool
@@ -46,6 +46,51 @@ class BotMoveRequest(BaseModel):
     board: list[list[dict[str, Any]]]
     rack: list[str]
     bag: list[str]
+
+    @field_validator("rack")
+    @classmethod
+    def validate_rack(cls, tiles: list[str]) -> list[str]:
+        if len(tiles) > 7:
+            raise ValueError("A rack cannot contain more than seven tiles.")
+        return cls._normalize_tiles(tiles)
+
+    @field_validator("bag")
+    @classmethod
+    def validate_bag(cls, tiles: list[str]) -> list[str]:
+        return cls._normalize_tiles(tiles)
+
+    @field_validator("board")
+    @classmethod
+    def validate_board(cls, board: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]]:
+        if len(board) != 15 or any(len(row) != 15 for row in board):
+            raise ValueError("The board must contain exactly 15 rows of 15 squares.")
+        normalized: list[list[dict[str, Any]]] = []
+        for row in board:
+            normalized_row: list[dict[str, Any]] = []
+            for square in row:
+                letter = square.get("letter")
+                if letter is not None:
+                    if not isinstance(letter, str) or len(letter) != 1 or not letter.isascii() or not letter.isalpha():
+                        raise ValueError("Board letters must be A through Z or null.")
+                    letter = letter.upper()
+                is_blank = square.get("isBlank", False)
+                if not isinstance(is_blank, bool):
+                    raise ValueError("Board isBlank values must be boolean.")
+                if is_blank and letter is None:
+                    raise ValueError("An empty board square cannot be marked as a blank tile.")
+                normalized_row.append({**square, "letter": letter, "isBlank": is_blank})
+            normalized.append(normalized_row)
+        return normalized
+
+    @staticmethod
+    def _normalize_tiles(tiles: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for tile in tiles:
+            candidate = tile.upper()
+            if len(candidate) != 1 or (candidate != "?" and (not candidate.isascii() or not candidate.isalpha())):
+                raise ValueError("Tiles must be A through Z or ?.")
+            normalized.append(candidate)
+        return normalized
 
 
 class ConnectionManager:
@@ -139,7 +184,15 @@ async def run_bot_turn(game_id: str) -> None:
             payload,
         )
     except GameError:
-        if action == "play":
+        if action != "play":
+            return
+        # A rejected solver move should become a pass only if this is still the
+        # same bot turn. Another request may have resigned or otherwise advanced
+        # the game while the native solver was running.
+        current_turn = await asyncio.to_thread(store.get_bot_turn, game_id)
+        if current_turn is None or current_turn["version"] != turn["version"]:
+            return
+        try:
             await asyncio.to_thread(
                 store.perform_action,
                 game_id,
@@ -148,6 +201,8 @@ async def run_bot_turn(game_id: str) -> None:
                 "pass",
                 {},
             )
+        except GameError:
+            return
 
 
 @app.get("/api/health")

@@ -1,7 +1,9 @@
+import asyncio
 import json
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 temporary_directory = tempfile.TemporaryDirectory()
@@ -13,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from game_store import GameStore
 from rules import create_board, evaluate_move
-from server import app, solver_pool, store
+from server import app, run_bot_turn, solver_pool, store
 
 
 def create_human_game(client: TestClient):
@@ -45,8 +47,26 @@ def run_tests():
     assert crossplay_board[7][0]["multiplier"] == "double_letter"
     assert crossplay_board[7][7]["multiplier"] == "none"
 
+    collision_store = GameStore(Path(temporary_directory.name) / "collision-test.db")
+    with patch("game_store.secrets.token_hex", side_effect=["deadbeef", "deadbeef", "cafebabe"]):
+        first_code = collision_store.create_game("human", "First")["snapshot"]["joinCode"]
+        second_code = collision_store.create_game("human", "Second")["snapshot"]["joinCode"]
+    assert first_code == "DEADBEEF" and second_code == "CAFEBABE"
+
     with TestClient(app) as client:
         assert client.get("/api/health").json() == {"status": "ok"}
+
+        malformed_bot_request = client.post(
+            "/api/bot_move",
+            json={"board": create_board()[:-1], "rack": ["A"], "bag": []},
+        )
+        assert malformed_bot_request.status_code == 422
+
+        invalid_bot_tile = client.post(
+            "/api/bot_move",
+            json={"board": create_board(), "rack": ["!"], "bag": []},
+        )
+        assert invalid_bot_tile.status_code == 422
 
         player_1, player_2 = create_human_game(client)
         game = player_2["snapshot"]
@@ -179,6 +199,23 @@ def run_tests():
         assert len(bot_snapshot["moves"]) == 2
         assert bot_snapshot["activePlayer"] == 0 or bot_snapshot["status"] == "finished"
         assert bot_snapshot["moves"][0]["player"] == "Bot"
+
+        race_game = store.create_game("bot", "Racer")
+        race_id = race_game["snapshot"]["gameId"]
+        race_token = race_game["token"]
+        store.perform_action(race_id, race_token, 0, "pass", {})
+
+        def resign_while_solver_runs(_payload):
+            store.perform_action(race_id, race_token, 1, "resign", {})
+            return {
+                "success": True,
+                "tilesPlaced": [{"r": 7, "c": 7, "letter": "A", "isBlank": False}],
+            }
+
+        with patch.object(solver_pool, "solve", side_effect=resign_while_solver_runs):
+            asyncio.run(run_bot_turn(race_id))
+        race_snapshot = store.get_snapshot(race_id, race_token)
+        assert race_snapshot["status"] == "finished" and race_snapshot["finishReason"] == "resignation"
 
     solver_pool.close()
     temporary_directory.cleanup()

@@ -52,6 +52,14 @@ interface BlankPlacement {
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 
+function newestSnapshot(current: GameSnapshot | null, incoming: GameSnapshot): GameSnapshot {
+  if (!current || current.gameId !== incoming.gameId || incoming.version >= current.version) {
+    return incoming;
+  }
+  return current;
+}
+
+
 export default function ScrabbleGame() {
   const initialReference = new URLSearchParams(window.location.search).get("game");
   const [gameReference, setGameReference] = useState<string | null>(initialReference);
@@ -139,7 +147,9 @@ export default function ScrabbleGame() {
       socket = new WebSocket(websocketUrl(snapshot.gameId, token));
       socket.onmessage = event => {
         const message = JSON.parse(event.data);
-        if (message.type === "game_state") setSnapshot(message.snapshot);
+        if (message.type === "game_state") {
+          setSnapshot(current => newestSnapshot(current, message.snapshot));
+        }
       };
       socket.onclose = () => {
         if (!stopped) reconnectTimer = window.setTimeout(connect, 1500);
@@ -315,7 +325,7 @@ export default function ScrabbleGame() {
         expectedVersion: snapshot.version,
         ...extra,
       });
-      setSnapshot(next);
+      setSnapshot(current => newestSnapshot(current, next));
       setFeedback({
         text: type === "play" ? "Move accepted." : type === "exchange" ? "Tiles exchanged." : type === "pass" ? "Turn passed." : "Game resigned.",
         type: "success",
@@ -323,7 +333,8 @@ export default function ScrabbleGame() {
     } catch (error) {
       setFeedback({ text: error instanceof Error ? error.message : "Action failed.", type: "error" });
       try {
-        setSnapshot(await loadGame(snapshot.gameId, token));
+        const current = await loadGame(snapshot.gameId, token);
+        setSnapshot(previous => newestSnapshot(previous, current));
       } catch {
         // Preserve the actionable error from the original request.
       }

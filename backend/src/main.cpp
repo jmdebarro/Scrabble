@@ -14,7 +14,6 @@ using namespace std;
 // Constants
 const char FLIP_RIGHT = '<';
 const char WORD_END = '$';
-const int BOARD_SIZE = 15;
 
 // Scrabble face values
 const unordered_map<char, int> LETTER_VALUES = {
@@ -352,8 +351,8 @@ class MoveScorer {
 public:
     static int score_move(const BoardState& board, const Move& move) {
         // Fast map of placed tiles
-        char placed_letters[15][15] = {0};
-        bool is_blank_tile[15][15] = {false};
+        char placed_letters[15][15] = {};
+        bool is_blank_tile[15][15] = {};
         for (const auto& tp : move.tiles_placed) {
             placed_letters[tp.r][tp.c] = tp.letter;
             is_blank_tile[tp.r][tp.c] = tp.is_blank;
@@ -517,13 +516,17 @@ public:
         double defense_penalty = 0.0;
         int dr[] = {-1, 1, 0, 0};
         int dc[] = {0, 0, -1, 1};
+        unordered_set<int> newly_occupied;
+        for (const auto& tile : move.tiles_placed) {
+            newly_occupied.insert(tile.r * 15 + tile.c);
+        }
 
         for (const auto& tp : move.tiles_placed) {
             for (int i = 0; i < 4; i++) {
                 int nr = tp.r + dr[i];
                 int nc = tp.c + dc[i];
                 if (nr >= 0 && nr < 15 && nc >= 0 && nc < 15) {
-                    if (board.get_tile(nr, nc) == 0) {
+                    if (board.get_tile(nr, nc) == 0 && !newly_occupied.count(nr * 15 + nc)) {
                         string mult = BOARD_MULTIPLIERS[nr][nc];
                         if (mult == "TW") defense_penalty += 12.0;
                         else if (mult == "DW") defense_penalty += 6.0;
@@ -883,7 +886,10 @@ public:
         for (int i = 0; i < limit; i++) {
             const auto& move = scored_moves[i].first;
             double total_score_diff = 0.0;
-            mt19937 rng(seed ^ (0x9E3779B9u * static_cast<uint32_t>(i + 1)));
+            // Evaluate every candidate against the same deterministic sequence
+            // of opponent racks. Candidate-specific samples add avoidable noise
+            // to comparisons between otherwise similar moves.
+            mt19937 rng(seed);
 
             // Apply play temporarily
             BoardState sim_board = board;
