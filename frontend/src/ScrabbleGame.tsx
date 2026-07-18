@@ -453,7 +453,7 @@ export default function ScrabbleGame() {
             <button className="btn btn-recall" onClick={() => setPendingTiles([])} disabled={!pendingTiles.length || busy}>Recall</button>
             <button className="btn btn-shuffle" onClick={shuffleRack} disabled={Boolean(pendingTiles.length) || busy}>Shuffle</button>
             <button className="btn btn-swap" onClick={exchangeTiles} disabled={!isYourTurn || busy || Boolean(pendingTiles.length)}>Exchange</button>
-            <button className="btn btn-bot" onClick={() => void runAction("pass")} disabled={!isYourTurn || busy || Boolean(pendingTiles.length)}>Pass</button>
+            <button className="btn btn-pass" onClick={() => void runAction("pass")} disabled={!isYourTurn || busy || Boolean(pendingTiles.length)}>Pass</button>
           </div>
         </div>
 
@@ -478,8 +478,6 @@ export default function ScrabbleGame() {
               <button className="btn btn-bot" onClick={() => navigator.clipboard.writeText(inviteUrl)}>Copy Invite Link</button>
             </div>
           )}
-
-          {feedback && <div className={`feedback-alert feedback-${feedback.type}`}>{feedback.text}</div>}
 
           <div className="panel word-log-panel">
             <h3>Game History</h3>

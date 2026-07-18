@@ -445,6 +445,15 @@ h1, h2, h3, h4, h5 {
   background-image: linear-gradient(to bottom, #455a64 0%, #37474f 100%);
 }
 
+.btn-pass {
+  background-image: linear-gradient(to bottom, #a87332 0%, #805224 100%); /* Aged brass/caramel */
+  border: 1px solid #65401b;
+  border-bottom: 3px solid #482c12;
+}
+.btn-pass:hover:not(:disabled) {
+  background-image: linear-gradient(to bottom, #8f6029 0%, #6f451d 100%);
+}
+
 .btn-bot {
   background-image: linear-gradient(to bottom, #6a1b9a 0%, #4a148c 100%); /* Deep, sophisticated eggplant purple */
   border: 1px solid #311b92;
