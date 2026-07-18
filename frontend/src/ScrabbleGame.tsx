@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Board from "./Board";
 import Bench from "./Bench";
 import { loadWords, validateAndScoreMove, type PlacedTile, type Square } from "./boardLogic";
@@ -7,6 +7,7 @@ import {
   GameSnapshot,
   joinGame,
   loadGame,
+  MoveSummary,
   sendAction,
   tokenStorageKey,
   websocketUrl,
@@ -35,6 +36,12 @@ interface ScorePreview {
   side: "before" | "after";
 }
 
+interface FallingTile {
+  r: number;
+  c: number;
+  order: number;
+}
+
 
 export default function ScrabbleGame() {
   const initialReference = new URLSearchParams(window.location.search).get("game");
@@ -51,7 +58,10 @@ export default function ScrabbleGame() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [fallingTiles, setFallingTiles] = useState<FallingTile[]>([]);
   const lastSnapshotKey = useRef<string | null>(null);
+  const animatedMoveKey = useRef<string | null>(null);
+  const fallingTilesTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!gameReference || !token) return;
@@ -84,6 +94,30 @@ export default function ScrabbleGame() {
       lastSnapshotKey.current = snapshotKey;
     }
   }, [snapshot]);
+
+  useLayoutEffect(() => {
+    if (!snapshot) return;
+    const lastPlay = snapshot.moves.find(move => move.action === "play");
+    if (!lastPlay) return;
+
+    const moveKey = `${snapshot.gameId}:${lastPlay.turn}`;
+    if (animatedMoveKey.current === moveKey) return;
+    animatedMoveKey.current = moveKey;
+
+    const placements = getPlayPlacements(lastPlay);
+    if (placements.length === 0) return;
+
+    if (fallingTilesTimer.current !== null) window.clearTimeout(fallingTilesTimer.current);
+    setFallingTiles(placements.map((tile, order) => ({ ...tile, order })));
+    fallingTilesTimer.current = window.setTimeout(() => {
+      setFallingTiles([]);
+      fallingTilesTimer.current = null;
+    }, 550 + Math.max(placements.length - 1, 0) * 140);
+  }, [snapshot]);
+
+  useEffect(() => () => {
+    if (fallingTilesTimer.current !== null) window.clearTimeout(fallingTilesTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!snapshot || !token) return;
@@ -242,6 +276,8 @@ export default function ScrabbleGame() {
     setRackView(game.rack);
     setPendingTiles([]);
     setSelectedRackIndices([]);
+    animatedMoveKey.current = null;
+    setFallingTiles([]);
     setSnapshot(game);
     setFeedback({ text: game.status === "waiting" ? "Game created. Share the invite link." : "Game ready.", type: "success" });
   };
@@ -388,6 +424,7 @@ export default function ScrabbleGame() {
             onSquareClick={handleSquareClick}
             validWordSquares={validWordSquares}
             scorePreview={scorePreview}
+            fallingTiles={fallingTiles}
           />
 
           <div className="rack-area">
@@ -472,6 +509,8 @@ export default function ScrabbleGame() {
               setRackView([]);
               setPendingTiles([]);
               setSelectedRackIndices([]);
+              animatedMoveKey.current = null;
+              setFallingTiles([]);
               setGameReference(null);
               setToken(null);
             }}>Return to lobby</button>
@@ -537,6 +576,23 @@ function formatModifier(
   }) as Record<string, unknown> | undefined;
   const letter = typeof placement?.letter === "string" ? placement.letter.toUpperCase() : null;
   return letter ? `${label} ${letter}` : label;
+}
+
+
+function getPlayPlacements(move: MoveSummary): { r: number; c: number }[] {
+  if (!Array.isArray(move.details.placements)) return [];
+
+  const placements = move.details.placements.flatMap(item => {
+    if (typeof item !== "object" || item === null) return [];
+    const placement = item as Record<string, unknown>;
+    return Number.isInteger(placement.r) && Number.isInteger(placement.c)
+      ? [{ r: placement.r as number, c: placement.c as number }]
+      : [];
+  });
+  if (placements.length < 2) return placements;
+
+  const isHorizontal = placements.every(tile => tile.r === placements[0].r);
+  return [...placements].sort((a, b) => isHorizontal ? a.c - b.c : a.r - b.r);
 }
 
 

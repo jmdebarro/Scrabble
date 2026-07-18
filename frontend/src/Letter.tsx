@@ -6,13 +6,15 @@ type LetterProps = {
   isSelected: boolean;
   onClick?: () => void;
   isTranslucent?: boolean;
+  fallInDelayMs?: number;
 };
 
-export default function Letter({ letter, value, isSelected, onClick, isTranslucent }: LetterProps) {
+export default function Letter({ letter, value, isSelected, onClick, isTranslucent, fallInDelayMs }: LetterProps) {
   return (
     <div 
-      className={`letter ${isSelected ? 'selected' : ''} ${isTranslucent ? 'translucent-letter' : ''}`}
+      className={`letter ${isSelected ? 'selected' : ''} ${isTranslucent ? 'translucent-letter' : ''} ${fallInDelayMs !== undefined ? 'last-play-letter' : ''}`}
       onClick={onClick}
+      style={fallInDelayMs !== undefined ? { animationDelay: `${fallInDelayMs}ms` } : undefined}
     >
       <div className="letter-content">
         <div className="letter-text">{letter}</div>

@@ -8,9 +8,12 @@ interface BoardProps {
   recommendedTiles?: { r: number; c: number; letter: string; isBlank: boolean }[];
   validWordSquares?: { r: number; c: number }[];
   scorePreview?: { r: number; c: number; score: number; direction: "H" | "V"; side: "before" | "after" } | null;
+  fallingTiles?: { r: number; c: number; order: number }[];
 }
 
-export default function Board({ board, onSquareClick, highlightedSquares, recommendedTiles, validWordSquares, scorePreview }: BoardProps) {
+export default function Board({ board, onSquareClick, highlightedSquares, recommendedTiles, validWordSquares, scorePreview, fallingTiles }: BoardProps) {
+  const fallingTileOrders = new Map(fallingTiles?.map(tile => [`${tile.r}:${tile.c}`, tile.order]));
+
   return (
     <div className="board">
       {board.map((row, r) => (
@@ -29,6 +32,7 @@ export default function Board({ board, onSquareClick, highlightedSquares, recomm
             const highlightClass = isHighlighted ? "highlighted-square" : "";
             const isValidWordSquare = validWordSquares?.some(vs => vs.r === r && vs.c === c) || false;
             const validWordClass = isValidWordSquare ? "valid-word-square" : "";
+            const fallingOrder = fallingTileOrders.get(`${r}:${c}`);
 
             return (
               <div 
@@ -42,6 +46,7 @@ export default function Board({ board, onSquareClick, highlightedSquares, recomm
                     value={square.isBlank ? 0 : LETTER_VALUES[square.letter!] || 0}
                     isSelected={false}
                     onClick={() => onSquareClick(r, c)}
+                    fallInDelayMs={fallingOrder === undefined ? undefined : fallingOrder * 140}
                   />
                 ) : recTile ? (
                   <Letter
